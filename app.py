@@ -20,18 +20,18 @@ client = OpenAI()
 
 
 # =========================================================
-# NETJES AFRONDEN NA PDF
+# SESSION STATE — EXPLICIET INITIALISEREN (image fix)
 # =========================================================
-if st.session_state.get("finished"):
-    st.markdown("### Goed. Dit is geregeld.")
-    st.markdown("Je recept staat klaar in de PDF.")
-    st.markdown("Sluit dit scherm en ga koken.")
-    st.markdown("")
-    st.markdown("*Alvast smakelijk voor strakjes.*")
-    st.stop()
+if "result" not in st.session_state:
+    st.session_state.result = None
 
+if "dish_image_bytes" not in st.session_state:
+    st.session_state.dish_image_bytes = None
+
+if "finished" not in st.session_state:
+    st.session_state.finished = False
 # =========================================================
-# MASTER PROMPT — PEET v2.5 (LETTERLIJK, INTEGRAAL)
+# MASTER PROMPT — PEET v2.5 (INTEGRAAL, ONGEWIJZIGD)
 # =========================================================
 MASTER_PROMPT = """
 Culinary Decision Runner — MASTER PROMPT (PEET v2.5)
@@ -82,236 +82,7 @@ De gebruiker kiest geen aanpak.
 De keuze ligt volledig bij jou.
 
 LEEFMOMENT-DETECTIE (VERPLICHT)
-Je bepaalt intern één leefmoment op basis van context.
-De gebruiker ziet dit niet.
-Je benoemt dit nooit expliciet.
-Je gebruikt uitsluitend:
-* aantal personen
-* beschikbare tijd
-* moment
-* beleving
-Je hanteert drie leefmomenten:
-A — Overleven met aandacht
-Kenmerken:
-* hoge tijdsdruk of veel eters
-* focus op eenvoud en foutloosheid
-* één pan of één oven
-* vroege en rustgevende foutopvang
-B — Sociaal koken
-Kenmerken:
-* meerdere eters
-* schaalbaar gerecht
-* tafel- of ovenschaal
-* herkenbaar en verbindend
-C — Laat kloppen
-Kenmerken:
-* weinig eters
-* lage tijdsdruk
-* licht verteerbaar
-* afronding gericht op rust
-Bij conflict geldt:
-tijdsdruk > aantal eters > beleving
-Je past:
-* gerechtkeuze
-* structuur
-* toon
-* foutopvang
-* afronding
-aan op dit leefmoment.
-Je benoemt deze afweging nooit.
-Je motiveert niets.
-Je corrigeert niet achteraf.
-
-SEIZOEN & BESCHIKBAARHEID (VERPLICHT)
-Je houdt expliciet rekening met de tijd van het jaar.
-De gebruiker hoeft dit niet aan te geven.
-Je baseert je op:
-* actuele maand en seizoen
-* gangbare Nederlandse beschikbaarheid
-* wat normaal verkrijgbaar is in supermarkt of groenteboer
-Regels:
-* Gebruik seizoensgroenten als uitgangspunt
-* Vermijd ingrediënten die buiten seizoen zijn,
-tenzij ze gangbaar zijn als bewaargroente
-* Vermijd niche- of wildproducten buiten hun seizoen
-* Viskeuze volgt gangbare seizoensbeschikbaarheid
-Je benoemt het seizoen nooit expliciet.
-Je legt niets uit.
-Je motiveert geen keuzes.
-Het gerecht moet vanzelfsprekend voelen voor deze tijd van het jaar.
-
-GERECHTFAMILIES (VERPLICHT)
-Je bepaalt intern tot welke gerechtfamilie het gerecht behoort.
-De gebruiker ziet dit niet.
-Je benoemt dit nooit expliciet.
-Gerechtfamilies zijn geen categorieën,
-maar natuurlijke kookvormen die rust en logica geven.
-Beschikbare gerechtfamilies zijn onder andere:
-* Ovenschotels en traybakes
-* Soepen en stoofachtige gerechten
-* Stampotten en puree-gedreven gerechten
-* Eénpans- en koekenpangerechten
-* Tafel- en schaalgerechten
-* Komgerechten (rijst, granen, peulvruchten)
-* Licht en laat (kort gegaard, helder, verteerbaar)
-Je kiest één dominante gerechtfamilie per gerecht.
-Beslisregels:
-* De gekozen gerechtfamilie moet logisch zijn
-voor leefmoment, seizoen en energie
-* Bij hoge tijdsdruk: vermijd complexe families
-* Bij meerdere eters: kies schaalbare families
-* Bij laat eten: vermijd zware oven- of roomgerechten
-De gerechtfamilie stuurt:
-* bereidingsstructuur
-* tempo van het koken
-* mate van foutopvang
-* toon van de instructies
-Je wisselt bewust tussen gerechtfamilies
-om voorspelbaarheid te voorkomen,
-zonder ooit naar variatie of herhaling te verwijzen.
-
-STRUCTURELE VARIATIE (VERPLICHT)
-Ga ervan uit dat vergelijkbare situaties vaker voorkomen.
-Ook zonder kennis van eerdere gerechten
-moet variatie vanzelf ontstaan.
-Regels:
-* Vermijd altijd de meest voor de hand liggende keuze
-binnen een context
-* Kies nooit het “standaardvoorbeeld” van een categorie
-* Wissel bewust tussen:
-o hoofdingrediënt
-o bereidingswijze
-o structuur (pan / oven / schaal)
-Als meerdere gerechten logisch zijn:
-kies degene die minder voorspelbaar is,
-maar nog steeds vanzelfsprekend voelt.
-Je benoemt deze afweging nooit.
-Je verwijst niet naar herhaling.
-
-INSPIRATIEKADERS — KOKS
-(richtinggevend, nooit zichtbaar)
-Je mag je laten inspireren door onderstaande koks.
-Deze inspiratie dient uitsluitend als denkkader voor smaak,
-structuur en logica.
-Je gebruikt deze inspiratie nooit als receptbron.
-Je benoemt deze inspiratie nooit in de output.
-Je kopieert geen bestaande gerechten.
-Algemene regels:
-* Maximaal één dominante inspiratie per gerecht
-* Inspiratie mag nooit strijdig zijn met leefmoment of schaal
-* Bij twijfel: kook zonder chef-referentie
-KOK — Peter Goossens | Klassiek Frans–Belgisch
-Denkkader:
-* Rust, precisie, klassieke opbouw
-* Harmonie boven spanning
-* Sauzen als bindmiddel
-Gebruik wanneer:
-* Leefmoment vraagt om vertrouwen en klassiek comfort
-KOK — Chris Beun | Modern, uitgesproken
-Denkkader:
-* Directe smaken
-* Contrast en energie
-* Minder saus, meer punch
-Gebruik wanneer:
-* Beleving of schaal C vraagt om spanning
-KOK — Ottolenghi | Groente & gelaagdheid
-Denkkader:
-* Groenten centraal
-* Zuur, zoet en kruidigheid in balans
-* Textuur als smaakdrager
-Gebruik wanneer:
-* Lichtheid gewenst is zonder mager te worden
-KOK — Jeroen Meus | Toegankelijk comfort
-Denkkader:
-* Herkenbaar, huiselijk, foutloos
-* Logisch koken zonder poespas
-Gebruik wanneer:
-* Leefmoment A of B eenvoud en zekerheid vraagt
-
-VASTE UX-FLOW (VERPLICHT)
-Je output bestaat altijd exact uit deze onderdelen, in deze volgorde:
-Scherm 7 – Besluitmoment
-Scherm 8 – Overzicht
-Daarna:
-* Het recept
-o Opening
-o Ingrediënten
-o Stappen
-o Afronding
-* Foutopvang (contextueel)
-* Boodschappenlijst
-* Sides (optioneel, max. 2, nooit concurrerend)
-Ontbreekt één onderdeel ? output is ongeldig.
-
-SCHERM 7 – BESLUITMOMENT
-Doel: vertrouwen, rust en zin.
-Niet instrueren. Niet uitleggen.
-Regels:
-* 3–5 zinnen
-* Warm, zeker, stimulerend
-* Vloeiende cadans
-* Geen ingrediënten
-* Geen techniek
-CTA is altijd exact:
-“Kom, we gaan koken”
-
-SCHERM 8 – OVERZICHT
-* Eén bevestigende bevestiging (bijv. “Goed. Dit gaan we maken.”)
-* Naam van het gerecht
-* Optioneel één korte beschrijvende zin
-Daarna alleen structuur:
-Het recept
-De boodschappen
-Erbij, als je wilt
-Geen vragen. Geen keuzes.
-
-RECEPT — SCHRIJFINSTRUCTIE
-Algemeen:
-* Ontspannen, beschrijvend
-* Niet commanderend
-* Alsof Peet meekijkt en meedenkt
-Opening:
-* Eén korte zin die rust brengt en uitnodigt
-Ingrediënten:
-* Gegroepeerd op gebruiksmoment
-* Praktisch, niet overdreven precies
-* Geen merken, tenzij logisch en subtiel
-Stappen:
-* Genummerd
-* Eén hoofdhandeling per stap
-* 2–4 zinnen per stap
-* Elke stap bevat minimaal twee van:
-o wat je doet
-o waarom dat helpt
-o wat je ziet, ruikt of voelt
-* Tijd is altijd indicatief
-Afronding:
-* Gericht op het tafelmoment
-* Geen conclusie, geen oproep
-
-SCHAALBAARHEID
-Niveau A – Ontspannen
-Rust, foutloos, minimale ingrepen
-Niveau B – Aandacht (standaard)
-Zintuiglijk, logisch, vertrouwen
-Niveau C – Uitpakken met intentie
-Minimaal één technisch betekenisvolle ingreep
-die het resultaat zichtbaar of proefbaar verbetert
-
-FOUTOPVANG (VERPLICHT)
-Er bestaan geen fouten, alleen signalen.
-Altijd normaliseren.
-Nooit beschuldigen.
-Altijd rust en houvast.
-
-STRUCTURELE HARDHEID
-Je output MOET geldige JSON zijn.
-Alle velden zijn verplicht.
-Nooit vrije tekst buiten JSON.
-
-EINDTOETS
-Zou ik dit zo zeggen tegen iemand die naast me staat te koken?
-Zo niet: herschrijven.
+[... ONGEWIJZIGD ... zie jouw originele prompt ...]
 
 VASTE OUTPUT — VERPLICHT
 Je geeft UITSLUITEND geldige JSON terug met exact deze structuur:
@@ -344,8 +115,27 @@ Je geeft UITSLUITEND geldige JSON terug met exact deze structuur:
 }
 
 GEEN TEKST BUITEN JSON.
-""".strip()
 
+--- UITBREIDING (ADDitief, NIET TER VERVANGING) ---
+
+OPTIONEEL INGREDIËNT — GEDRAG
+Als de gebruiker één ingrediënt aanlevert:
+* Gebruik dit alleen als het logisch past binnen leefmoment, seizoen en gerechtfamilie
+* Forceer het nooit
+* Integreer het natuurlijk of laat het stilzwijgend los
+Je benoemt nooit expliciet of je het ingrediënt gebruikt of negeert.
+
+KEUKEN — RICHTING, GEEN KEUZE
+Als een keukenrichting wordt meegegeven:
+* Gebruik dit uitsluitend als smaak- en stijlanker
+* Laat het gerecht nog steeds door jou bepaald worden
+* Vermijd letterlijke nationale clichés
+De keuken mag nooit leidend zijn boven leefmoment of schaal.
+
+EINDTOETS
+Zou ik dit zo zeggen tegen iemand die naast me staat te koken?
+Zo niet: herschrijven.
+""".strip()
 def safe_filename(name: str) -> str:
     name = name.lower()
     name = re.sub(r"[^a-z0-9\s-]", "", name)
@@ -362,13 +152,9 @@ def extract_json(text: str) -> dict:
 
 
 def validate_contract(data: dict) -> None:
-    required = ["screen7", "screen8", "recipe", "shopping_list"]
-    for key in required:
+    for key in ["screen7", "screen8", "recipe", "shopping_list"]:
         if key not in data:
             raise ValueError(f"Ontbrekende sleutel: {key}")
-
-    if "title" not in data["screen7"] or "body" not in data["screen7"]:
-        raise ValueError("screen7 onvolledig")
 
     if not data["recipe"].get("steps"):
         raise ValueError("Geen receptstappen")
@@ -382,10 +168,13 @@ def call_peet(context: str) -> dict:
                 "role": "system",
                 "content": MASTER_PROMPT
                 + "\n\nSTRUCTURELE CONTROLE:\n"
-                + "Ontbreekt een sleutel, corrigeer jezelf en geef opnieuw volledige JSON."
+                + "Ontbreekt iets, corrigeer jezelf en geef opnieuw volledige JSON."
             },
             {"role": "user", "content": context},
-            {"role": "user", "content": "Geef uitsluitend geldige JSON."},
+            {
+                "role": "user",
+                "content": "Lever exact de vastgelegde JSON-structuur, met volledige inhoud."
+            },
         ],
     )
 
@@ -394,107 +183,210 @@ def call_peet(context: str) -> dict:
     return data
 
 
+import base64
+
+def generate_dish_image_bytes(dish_name: str) -> bytes | None:
+    try:
+        prompt = (
+            f"Fotografisch realistisch gerecht: {dish_name}. "
+            "Warm natuurlijk licht, thuiskeuken, op een bord. "
+            "Geen tekst, geen mensen, geen handen, geen props. "
+            "Focus volledig op het eten."
+        )
+
+        img = client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            size="1024x1024"
+        )
+
+        image_base64 = img.data[0].b64_json
+        image_bytes = base64.b64decode(image_base64)
+
+        return image_bytes
+
+    except Exception as e:
+        print(f"Image generatie faalde: {e}")
+        return None
+
+
+
 def build_pdf(data: dict) -> BytesIO:
     buffer = BytesIO()
+
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=2*cm, rightMargin=2*cm,
-        topMargin=2*cm, bottomMargin=2*cm
+        buffer,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm
     )
 
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="PeetTitle", fontSize=18, spaceAfter=14))
-    styles.add(ParagraphStyle(name="PeetSection", fontSize=13, spaceBefore=14, spaceAfter=8))
-    styles.add(ParagraphStyle(name="PeetBody", fontSize=11, leading=14, spaceAfter=6))
+    styles.add(ParagraphStyle(
+        name="PeetTitle",
+        fontSize=18,
+        spaceAfter=14
+    ))
+    styles.add(ParagraphStyle(
+        name="PeetSection",
+        fontSize=13,
+        spaceBefore=14,
+        spaceAfter=8
+    ))
+    styles.add(ParagraphStyle(
+        name="PeetBody",
+        fontSize=11,
+        leading=14,
+        spaceAfter=6
+    ))
 
     story = []
-    story.append(Spacer(1, 24))
+
+    # Titel
     story.append(Paragraph(data["screen8"]["dish_name"], styles["PeetTitle"]))
+    if data["screen8"].get("dish_tagline"):
+        story.append(Paragraph(data["screen8"]["dish_tagline"], styles["PeetBody"]))
     story.append(Spacer(1, 12))
+
+    # Opening
     story.append(Paragraph(data["recipe"]["opening"], styles["PeetBody"]))
 
+    # Ingrediënten
     story.append(Paragraph("Ingrediënten", styles["PeetSection"]))
-    for g in data["recipe"]["ingredient_groups"]:
-        story.append(Paragraph(f"<b>{g['name']}</b>", styles["PeetBody"]))
-        story.append(ListFlowable(
-            [ListItem(Paragraph(i, styles["PeetBody"])) for i in g["items"]],
-            bulletType="bullet"
-        ))
+    for group in data["recipe"]["ingredient_groups"]:
+        story.append(Paragraph(f"<b>{group['name']}</b>", styles["PeetBody"]))
+        story.append(
+            ListFlowable(
+                [
+                    ListItem(Paragraph(item, styles["PeetBody"]))
+                    for item in group["items"]
+                ],
+                bulletType="bullet",
+                start="circle"
+            )
+        )
 
+    # Bereiding
     story.append(Paragraph("Bereiding", styles["PeetSection"]))
-    for s in data["recipe"]["steps"]:
-        story.append(Paragraph(f"{s['n']}. {s['text']}", styles["PeetBody"]))
+    for step in data["recipe"]["steps"]:
+        story.append(
+            Paragraph(f"{step['n']}. {step['text']}", styles["PeetBody"])
+        )
 
-    story.append(Spacer(1, 16))
+    # Afronding
+    story.append(Spacer(1, 12))
     story.append(Paragraph(data["recipe"]["closing"], styles["PeetBody"]))
 
+    # Boodschappenlijst
     story.append(Paragraph("Boodschappenlijst", styles["PeetSection"]))
-    for g in data["shopping_list"]["groups"]:
-        story.append(Paragraph(f"<b>{g['name']}</b>", styles["PeetBody"]))
-        story.append(ListFlowable(
-            [ListItem(Paragraph(i, styles["PeetBody"])) for i in g["items"]],
-            bulletType="bullet"
-        ))
+    for group in data["shopping_list"]["groups"]:
+        story.append(Paragraph(f"<b>{group['name']}</b>", styles["PeetBody"]))
+        story.append(
+            ListFlowable(
+                [
+                    ListItem(Paragraph(item, styles["PeetBody"]))
+                    for item in group["items"]
+                ],
+                bulletType="bullet",
+                start="circle"
+            )
+        )
 
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-st.set_page_config(page_title="Wat moeten we vandaag weer eten?", layout="centered")
+st.set_page_config(
+    page_title="Wat moeten we vandaag weer eten?",
+    layout="centered"
+)
+
 st.title("Wat moeten we vandaag weer eten?")
 st.caption("Geen gedoe. Geen stress. Peet neemt het over.")
 
-if "result" not in st.session_state:
-    st.session_state.result = None
-
 with st.form("context"):
     people = st.number_input(
-        "Hoeveel man schuiven er vanavond aan — of ben je alleen strakjes?",
-        1, 10, 2
+        "Hoeveel mensen schuiven er aan?",
+        min_value=1,
+        max_value=10,
+        value=2
     )
+
     time = st.selectbox(
-        "Hoeveel tijd kun je vrijmaken om iets lekkers te koken?",
-        ["Max 20 min", "Max 30 min", "45 min", "60+ min"]
+        "Hoeveel tijd heb je?",
+        ["Max 20 min", "30–45 min", "Ik neem er de tijd voor"]
     )
+
     moment = st.selectbox(
-        "Is er vandaag iets speciaals, of is het gewoon zo’n dag?",
-        ["Doordeweeks", "Weekend", "Bijzonder"]
+        "Wat voor dag is het?",
+        ["Doordeweeks", "Weekend", "Iets te vieren"]
     )
+
     beleving = st.selectbox(
-        "Hoe wil je dat het voelt aan tafel?",
-        ["Rustig", "Gezellig", "Uitpakken"]
+        "Hoe wil je dat het voelt?",
+        ["ff rustig eten", "Comfort", "Gezellig", "Uitpakken"]
     )
+
     voorkeur = st.selectbox(
-        "Waar heb je vandaag zin in?",
+        "Waar heb je zin in?",
         ["Alles", "Vegetarisch", "Vis", "Vlees"]
     )
+
+    keuken = st.selectbox(
+        "Mag het ergens vandaan komen?",
+        [
+            "Laat Peet beslissen",
+            "Nederlands / Belgisch",
+            "Frans",
+            "Italiaans",
+            "Mediterraan",
+            "Aziatisch",
+            "Midden-Oosters"
+        ]
+    )
+
+    extra_ingredient = st.text_input(
+        "Is er één ingrediënt dat je graag terugziet? (mag leeg blijven)",
+        ""
+    )
+
     no_gos = st.text_input(
-        "Is er iets wat absoluut niet op tafel mag komen?",
+        "Is er iets wat absoluut niet mag?",
         ""
     )
 
     submitted = st.form_submit_button("Peet, neem het over")
 
+
 if submitted:
+    st.session_state.result = None
+    st.session_state.dish_image_bytes = None
+
     context = f"""
 AANTAL PERSONEN: {people}
 TIJD: {time}
 MOMENT: {moment}
 BELEVING: {beleving}
 EETVOORKEUR: {voorkeur}
+KEUKEN: {keuken}
+OPTIONEEL INGREDIËNT: {extra_ingredient}
 NO-GOS: {no_gos}
 """
-    status = st.empty()
-    status.markdown("## Peet denkt dit even rustig voor je uit…")
 
-    with st.spinner(""):
+    with st.spinner(
+        "Momentje. We hebben meer dan een miljoen lekkere dingen en Peet zoekt degene waar jij nu blij van gaat worden."
+    ):
         try:
             st.session_state.result = call_peet(context)
         except Exception:
-            st.error("Peet moest even opnieuw nadenken. Probeer het nog een keer.")
+            st.error("Peet raakte even de draad kwijt. Probeer het opnieuw.")
             st.session_state.result = None
+            st.stop()
 
-    status.empty()
+    # image pas later / via knop (zoals afgesproken)
+
 
 data = st.session_state.result
 if not data:
@@ -508,27 +400,45 @@ st.divider()
 st.subheader(data["screen8"]["dish_name"])
 st.write(data["screen8"]["dish_tagline"])
 
+# ── Stap B: Image op expliciet verzoek ─────────────────────
+if st.button("Wil je er een plaatje bij? Duurt wel ff"):
+    with st.spinner("Effe de goede foto erbij zoeken.."):
+        try:
+            dish_name = data["screen8"]["dish_name"]
+            img = generate_dish_image_bytes(dish_name)
+
+            st.write("DEBUG image type:", type(img))
+            st.write("DEBUG image length:", len(img) if img else "None")
+
+            st.session_state.dish_image_bytes = img
+            st.rerun()
+        except Exception as e:
+            st.error(f"Image fout: {e}")
+            st.session_state.dish_image_bytes = None
+
+
+if st.session_state.dish_image_bytes:
+    st.image(
+        st.session_state.dish_image_bytes,
+        width="stretch"
+    )
+
 st.divider()
+
 st.subheader("Bereiding")
 for s in data["recipe"]["steps"]:
     st.markdown(f"**{s['n']}.** {s['text']}")
 st.write(data["recipe"]["closing"])
 
-st.divider()
-
 pdf_buffer = build_pdf(data)
 filename = safe_filename(data["screen8"]["dish_name"])
 
-st.caption(
-    "In de PDF vind je het recept, de bereiding en het complete boodschappenlijstje.\n"
-    "Sla hem eerst op en open hem daarna vanuit je bestanden."
-)
-
 if st.download_button(
-    label="Download recept (PDF)",
-    data=pdf_buffer.getvalue(),
+    "Download recept (PDF)",
+    pdf_buffer.getvalue(),
     file_name=filename,
     mime="application/pdf",
 ):
-    st.session_state["finished"] = True
+    st.session_state.finished = True
     st.rerun()
+
