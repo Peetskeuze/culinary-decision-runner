@@ -6,11 +6,71 @@ import time
 from io import BytesIO
 
 import streamlit as st
+
+# =========================================================
+# PAGE CONFIG (MOET ALS EERSTE)
+# =========================================================
 st.set_page_config(
     page_title="Peet Kiest",
     layout="centered"
 )
 
+# =========================================================
+# GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
+# =========================================================
+st.markdown("""
+<style>
+/* === LEESKADER === */
+.block-container {
+    max-width: 680px;
+    padding-top: 2.5rem;
+    padding-bottom: 3rem;
+}
+
+/* === BASIS TEKST === */
+html, body, [class*="css"] {
+    font-size: 17px;
+    line-height: 1.55;
+}
+
+/* === TITELS === */
+h1 {
+    font-size: 1.9rem;
+    font-weight: 600;
+    margin-bottom: 0.9rem;
+}
+
+h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-top: 2.2rem;
+    margin-bottom: 0.6rem;
+}
+
+h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1.6rem;
+}
+
+/* === PARAGRAFEN === */
+p {
+    margin-bottom: 1.1rem;
+}
+
+/* === KNOPPEN === */
+.stButton > button {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    border-radius: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================================================
+# OVERIGE IMPORTS
+# =========================================================
 from openai import OpenAI
 
 from reportlab.platypus import (
@@ -26,6 +86,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 
 from datetime import date
+
 
 
 # =========================================================
@@ -375,7 +436,6 @@ def build_pdf(data: dict, image_bytes: bytes | None = None) -> BytesIO:
 # =========================================================
 # UI
 # =========================================================
-st.set_page_config(page_title="Wat eten we vandaag?", layout="centered")
 
 st.title("Peet Kiest wat we eten vandaag.")
 st.caption("Geen gedoe. Geen stress. Peet staat naast je in de keuken.")
@@ -477,57 +537,70 @@ data = st.session_state.result
 # Titel
 st.title(data["screen8"]["dish_name"])
 
-# Tagline (rustig, geen kop)
+# Context (zacht)
+st.caption(
+    f"Voor {people} personen · {moment} · {beleving}"
+)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Tagline (mag ademen)
 if data["screen8"].get("dish_tagline"):
-    st.caption(data["screen8"]["dish_tagline"])
+    st.markdown(data["screen8"]["dish_tagline"])
+
 
 # Praktische startzin
 if data["recipe"].get("opening"):
-    st.write(data["recipe"]["opening"])
+    st.markdown(data["recipe"]["opening"])
 
 
 #------------- INTRO VOOR INGREDIËNTEN ---------------------------
 
-st.subheader("Zo pakken we het aan")
-st.caption("Geen stress. Dit lukt altijd.")
+st.markdown("### Zo pakken we het aan")
 
-st.write(
-    "We doen dit stap voor stap. "
-    "Tip van Peet: lees het recept eerst één keer helemaal door. "
-    "Daarna maak je het jezelf makkelijk: zorg dat alles klaarstaat, eventueel al gesneden. "
-    "Lees één stap, doe ’m op je gemak, en kijk dan pas weer verder."
-)
+st.markdown("""
+Geen stress.  
+Dit lukt altijd.
+""")
 
-st.divider()
+
+st.markdown("""
+We doen dit stap voor stap.
+
+*Tip van Peet:*  
+Lees het recept eerst één keer helemaal door.  
+Daarna maak je het jezelf makkelijk: zorg dat alles klaarstaat, eventueel al gesneden.
+
+Lees één stap, doe ’m op je gemak,  
+en kijk dan pas weer verder.
+""")
 
 #------------- INGREDIËNTEN OP HET SCHERM -------------------------
 
+st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("### Ingrediënten")
 
 for grp in data["recipe"].get("ingredient_groups", []):
     name = grp.get("name", "").strip() or "Benodigd"
     items = grp.get("items", []) or []
 
-    ingredient_text = f"**{name}**\n"
-    if items:
-        ingredient_text += "\n".join(f"- {it}" for it in items)
-    else:
-        ingredient_text += "- —"
+    st.markdown(f"**{name}**")
+    for it in items:
+        st.markdown(f"- {it}")
 
-    st.markdown(ingredient_text)
-
-st.divider()
 
 # ---------------- BEREIDING OP HET SCHERM ------------------------
 
 steps = data["recipe"].get("steps", [])
 
-for s in data["recipe"].get("steps", []):
-    text = s.get("text", "").strip()
-    st.markdown(text)
+for s in steps:
+    st.markdown(s.get("text", "").strip())
+    st.markdown("<br>", unsafe_allow_html=True)
 
 
-st.write(data["recipe"]["closing"])
+st.markdown(data["recipe"]["closing"])
+
+st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ---------------- PDF ----------------
 pdf_buffer = build_pdf(data, image_bytes=st.session_state.dish_image_bytes)
@@ -540,7 +613,7 @@ st.download_button(
     mime="application/pdf",
 )
 # ---------------- FOTO OP KNOP ----------------
-st.markdown("### Wil je ‘m ook even zien?")
+st.caption("Wil je ’m ook even zien?")
 if st.button("Wil je er een plaatje bij? Duurt wel ff"):
     st.session_state.wants_image = True
 
