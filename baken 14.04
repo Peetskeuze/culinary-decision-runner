@@ -1,0 +1,72 @@
+🪨 BAKEN GEZET
+
+Naam baken
+Peet Calorie – Inspiratiekaders per maaltijdtype stabiel
+
+Datum
+6 januari 2026
+
+Wat ligt hiermee vast (belangrijk)
+Functioneel
+
+Calorie-app werkt stabiel
+
+Slider 250–650 kcal is leidend
+
+Meal type (Ontbijt / Lunch / Diner) wordt correct:
+
+gegenereerd
+
+gerenderd
+
+Calorie-duiding is menselijk en adviserend
+
+Prompt / Inhoud
+
+Eén definitief inspiratieblok
+
+Aangescherpt per maaltijdtype
+
+Koks/keukens alleen als denkkader
+
+Nooit zichtbaar in output
+
+Geen dubbele instructies meer
+
+Architectuur
+
+culinary_decision_cloud/app.py blijft onaangeroerd (Peet Kiest)
+
+culinary_decision_suite is de uitbreidbare lijn
+
+peet_calorie is nu een stabiele basisvariant
+
+Wat we hierna bewust kunnen doen (later)
+
+Dit baken is het startpunt voor uitbreidingen zoals:
+
+macro’s (eiwit / koolhydraten / vetten)
+
+eiwit-focus (sportdag vs rustdag)
+
+dagtotaal-logica (ontbijt + lunch + diner)
+
+calorie-cycli (trainingsdagen / weekend)
+
+Maar: niet nu, niet per ongeluk.
+
+Wat jij nu kunt doen
+
+Commit / backup deze staat
+
+Even afstand nemen
+
+Met een gerust hart verder bouwen vanaf dit punt
+
+Wanneer je terugkomt, hoef je alleen te zeggen:
+
+“Pak baken: Peet Calorie – Inspiratiekaders per maaltijdtype”
+
+Dan weten we exact waar we verdergaan.
+
+Strak werk. Dit staat.
