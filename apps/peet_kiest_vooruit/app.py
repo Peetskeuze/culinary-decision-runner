@@ -119,22 +119,35 @@ st.title("Peet Kiest – Vooruit")
 st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
 
 # =========================================================
+# SYNC QUERY PARAM -> SESSION STATE
+# =========================================================
+if "days" not in st.session_state or st.session_state.days != days_from_query:
+    st.session_state.days = days_from_query
+
+# =========================================================
 # FORM
 # =========================================================
 with st.form("context"):
+
+    days_options = [1, 2, 3, 5]
+
     days = st.selectbox(
         "Voor hoeveel dagen zal ik kiezen?",
-        [1, 2, 3, 4, 5],
-        index=0
+        days_options,
+        key="days"
     )
 
-    people = st.number_input("Hoeveel mensen schuiven er aan?", min_value=1, max_value=10, value=2)
+    people = st.number_input(
+        "Hoeveel mensen schuiven er aan?",
+        min_value=1,
+        max_value=10,
+        value=2
+    )
 
     veggie = st.selectbox(
         "Wil je vegetarisch eten?",
         ["Nee, laat Peet kiezen", "Ja, vegetarisch"],
     )
-
 
     keuken = st.selectbox(
         "Moet ik aan een bepaalde keuken denken?",
@@ -150,8 +163,7 @@ with st.form("context"):
     )
 
     extra_ingredient = st.text_input(
-        "Heb je al iets in huis waar ik rekening mee kan houden?"
-        " Of wat je misschien hartstikke lekker vindt? ",
+        "Heb je al iets in huis waar ik rekening mee kan houden? Of wat je misschien hartstikke lekker vindt?",
         placeholder="Bijvoorbeeld prei, kip, feta…"
     )
 
