@@ -28,6 +28,19 @@ st.set_page_config(
 )
 
 # =========================================================
+# QUERY PARAMS (DAYS UIT CARRD)
+# =========================================================
+query_params = st.query_params
+
+try:
+    days_from_query = int(query_params.get("days", ["1"])[0])
+except Exception:
+    days_from_query = 1
+
+if days_from_query not in (1, 2, 3, 5):
+    days_from_query = 1
+
+# =========================================================
 # GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
 # =========================================================
 st.markdown("""
