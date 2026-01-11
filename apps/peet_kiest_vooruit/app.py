@@ -28,17 +28,26 @@ st.set_page_config(
 )
 
 # =========================================================
-# QUERY PARAMS (DAYS UIT CARRD)
+# ROUTER — MODE & EFFECTIVE DAYS (DEFINITIEF)
 # =========================================================
 query_params = st.query_params
 
-try:
-    days_from_query = int(query_params.get("days", ["1"])[0])
-except Exception:
-    days_from_query = 1
+mode = query_params.get("mode", ["vooruit"])[0]
+if mode not in ("vandaag", "vooruit"):
+    mode = "vooruit"
 
-if days_from_query not in (1, 2, 3, 5):
-    days_from_query = 1
+try:
+    days_from_query = int(query_params.get("days", ["2"])[0])
+except Exception:
+    days_from_query = 2
+
+if mode == "vandaag":
+    effective_days = 1
+else:
+    if days_from_query not in (2, 3, 5):
+        days_from_query = 2
+    effective_days = days_from_query
+
 
 # =========================================================
 # GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
@@ -115,95 +124,70 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
 # =========================================================
 # UI – HEADER
 # =========================================================
-st.title("Peet Kiest – Vooruit")
+st.title("Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit")
 st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
 
 # =========================================================
-# SYNC QUERY PARAM -> SESSION STATE
+# LICHTE KEUZES — EENMALIG, ZONDER FORMULIER
 # =========================================================
-if "days" not in st.session_state or st.session_state.days != days_from_query:
-    st.session_state.days = days_from_query
+if "choices_done" not in st.session_state:
+    st.session_state.choices_done = False
 
-# =========================================================
-# FORM
-# =========================================================
-with st.form("context"):
+if not st.session_state.choices_done:
 
-    days_options = [1, 2, 3, 5]
-
-    days = st.selectbox(
-        "Voor hoeveel dagen zal ik kiezen?",
-        days_options,
-        key="days"
-    )
+    st.markdown("**Goed. Ik regel dit voor je.**")
+    st.markdown("Even checken of dit voor jou klopt:")
 
     people = st.number_input(
-        "Hoeveel mensen schuiven er aan?",
+        "Voor hoeveel personen kook je?",
         min_value=1,
-        max_value=10,
-        value=2
+        max_value=6,
+        value=2,
+        step=1
     )
 
-    veggie = st.selectbox(
-        "Wil je vegetarisch eten?",
-        ["Nee, laat Peet kiezen", "Ja, vegetarisch"],
+    veggie = st.checkbox("Ik eet vegetarisch")
+
+    allergies = st.text_input(
+        "Allergieën of dingen die ik moet vermijden?",
+        placeholder="Bijvoorbeeld noten, schaal- en schelpdieren…"
     )
 
-    keuken = st.selectbox(
-        "Moet ik aan een bepaalde keuken denken?",
-        [
-            "Laat Peet beslissen",
-            "Nederlands / Belgisch",
-            "Frans",
-            "Italiaans",
-            "Mediterraan",
-            "Aziatisch",
-            "Midden-Oosters",
-        ],
-    )
+    if st.button("Ga door"):
+        st.session_state.people = people
+        st.session_state.veggie = veggie
+        st.session_state.allergies = allergies
+        st.session_state.choices_done = True
+        st.rerun()
 
-    extra_ingredient = st.text_input(
-        "Heb je al iets in huis waar ik rekening mee kan houden? Of wat je misschien hartstikke lekker vindt?",
-        placeholder="Bijvoorbeeld prei, kip, feta…"
-    )
-
-    no_gos = st.text_input(
-        "Is er iets dat ik beter niet kan gebruiken?",
-        placeholder="Allergie of liever niet…"
-    )
-
-    submitted = st.form_submit_button("Peet, neem het over")
+    st.stop()
 
 # =========================================================
-# SUBMIT & CALL PEET
+# AUTO-RUN — PEET DRAAIT AUTOMATISCH NA KEUZES
 # =========================================================
 
-if submitted:
-    # reset vorige run
-    st.session_state.result = None
+if st.session_state.choices_done and st.session_state.result is None:
 
     today = date.today().isoformat()
 
     context = f"""
 DATUM: {today}
-AANTAL DAGEN: {days}
-AANTAL PERSONEN: {people}
+MODE: {mode}
+AANTAL DAGEN: {effective_days}
+AANTAL PERSONEN: {st.session_state.people}
+VEGETARISCH: {"Ja" if st.session_state.veggie else "Nee"}
+ALLERGIEËN: {st.session_state.allergies if st.session_state.allergies else "Geen"}
 STANDAARD TIJD: 30 minuten
-KEUKENVOORKEUR: {keuken if keuken else "Peet bepaalt"}
-OPTIONEEL INGREDIËNT: {extra_ingredient}
-NO-GOS: {no_gos}
+KEUKENLOGICA:
+- 2 dagen: Belgisch / Nederlands
+- 3 dagen: Belgisch, Italiaans, Aziatisch
+- 5 dagen: Overwegend Belgisch / Nederlands met variatie
 """.strip()
 
-    st.markdown("**Goed. Ik regel dit voor je.**")
+    with st.spinner("Peet regelt het voor je…"):
+        st.session_state.result = call_peet(context)
 
-    with st.spinner("Peet zet het voor je klaar…"):
-        try:
-            st.session_state.result = call_peet(context)
-        except Exception as e:
-            st.error("Peet raakte even de draad kwijt. Probeer het opnieuw.")
-            st.caption(f"Debug: {e}")
-            st.stop()
-
+    st.rerun()
 
 # =========================================================
 # RESULT UIT SESSION HALEN
