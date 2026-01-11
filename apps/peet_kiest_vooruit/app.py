@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
 import os
 import json
 import re
@@ -10,7 +17,6 @@ from openai import OpenAI
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-
 
 
 # =========================================================
