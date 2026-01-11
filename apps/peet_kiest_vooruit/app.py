@@ -32,22 +32,24 @@ st.set_page_config(
 # =========================================================
 query_params = st.query_params
 
+# Mode bepalen
 mode = query_params.get("mode", ["vooruit"])[0]
 if mode not in ("vandaag", "vooruit"):
     mode = "vooruit"
 
+# Days uit query halen (alleen relevant bij 'vooruit')
 try:
     days_from_query = int(query_params.get("days", ["2"])[0])
 except Exception:
     days_from_query = 2
 
+# Effectief aantal dagen vaststellen
 if mode == "vandaag":
     effective_days = 1
 else:
     if days_from_query not in (2, 3, 5):
         days_from_query = 2
     effective_days = days_from_query
-
 
 # =========================================================
 # GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
