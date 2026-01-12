@@ -83,6 +83,10 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 _defaults = {
     "result": None,
     "dish_image_bytes": None,
+    "action": None,
+    "people": 2,
+    "veggie": False,
+    "allergies": "",
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
@@ -128,80 +132,82 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
 # =========================================================
 st.title("Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit")
 st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
+# =========================================================
+# INPUTS
+# =========================================================
+
+people = st.number_input(
+    "Voor hoeveel personen kook je?",
+    min_value=1,
+    max_value=10,
+    value=st.session_state.people,
+    step=1
+)
+
+veggie = st.checkbox(
+    "Vegetarisch",
+    value=st.session_state.veggie
+)
+
+allergies = st.text_input(
+    "Allergieën of dingen die ik moet vermijden?",
+    value=st.session_state.allergies,
+    placeholder="Bijvoorbeeld noten of schaal- en schelpdieren"
+)
 
 # =========================================================
-# LICHTE KEUZES — EENMALIG, ZONDER FORMULIER
+# ACTIEKNOPPEN
 # =========================================================
-if "choices_done" not in st.session_state:
-    st.session_state.choices_done = False
 
-if not st.session_state.choices_done:
+col1, col2 = st.columns(2)
 
-    st.markdown("**Goed. Ik regel dit voor je.**")
-    st.markdown("Even checken of dit voor jou klopt:")
-
-    people = st.number_input(
-        "Voor hoeveel personen kook je?",
-        min_value=1,
-        max_value=6,
-        value=2,
-        step=1
-    )
-
-    veggie = st.checkbox("Ik eet vegetarisch")
-
-    allergies = st.text_input(
-        "Allergieën of dingen die ik moet vermijden?",
-        placeholder="Bijvoorbeeld noten, schaal- en schelpdieren…"
-    )
-
-    if st.button("Ga door"):
+with col1:
+    if st.button("Peet, kies", use_container_width=True):
         st.session_state.people = people
         st.session_state.veggie = veggie
         st.session_state.allergies = allergies
-        st.session_state.choices_done = True
-        st.rerun()
+        st.session_state.action = "generate"
 
-    st.stop()
+with col2:
+    if st.button("Opnieuw", use_container_width=True):
+        st.session_state.action = "reset"
 
 # =========================================================
-# AUTO-RUN — PEET DRAAIT AUTOMATISCH NA KEUZES
+# ACTIE ROUTER
 # =========================================================
 
-if st.session_state.choices_done and st.session_state.result is None:
+action = st.session_state.get("action")
 
-    today = date.today().isoformat()
+if action == "reset":
+    st.session_state.clear()
+    st.query_params.clear()
+    st.rerun()
 
+if action == "generate":
     context = f"""
-DATUM: {today}
+DATUM: {date.today().isoformat()}
 MODE: {mode}
 AANTAL DAGEN: {effective_days}
 AANTAL PERSONEN: {st.session_state.people}
 VEGETARISCH: {"Ja" if st.session_state.veggie else "Nee"}
-ALLERGIEËN: {st.session_state.allergies if st.session_state.allergies else "Geen"}
+ALLERGIEËN: {st.session_state.allergies or "Geen"}
 STANDAARD TIJD: 30 minuten
-KEUKENLOGICA:
-- 2 dagen: Belgisch / Nederlands
-- 3 dagen: Belgisch, Italiaans, Aziatisch
-- 5 dagen: Overwegend Belgisch / Nederlands met variatie
 """.strip()
 
     with st.spinner("Peet regelt het voor je…"):
         st.session_state.result = call_peet(context)
 
+    st.session_state.action = None
     st.rerun()
 
 # =========================================================
 # RESULT UIT SESSION HALEN
 # =========================================================
-
 result = st.session_state.get("result")
-
 if result is None:
     st.stop()
 
 days_data = result.get("days", [])
-
 
 # =========================================================
 # RESULT WEERGEVEN OP SCHERM
