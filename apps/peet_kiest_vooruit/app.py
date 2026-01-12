@@ -93,13 +93,6 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# =========================================================
-# INPUTS — ALTIJD DEFINIËREN (OOK BIJ AUTO-RUN)
-# =========================================================
-
-people = st.session_state.people
-veggie = st.session_state.veggie
-allergies = st.session_state.allergies
 
 # =========================================================
 # GENERATION GUARD — DEFINITIEF
@@ -154,6 +147,22 @@ with top_block.container():
         st.session_state.veggie = veggie
         st.session_state.allergies = allergies
 
+# ============================================================
+# ACTIE — AUTO-RUN
+# ============================================================
+
+if should_generate:
+    context = json.dumps({
+        "mode": mode,
+        "days": effective_days,
+        "people": st.session_state.people,
+        "veggie": st.session_state.veggie,
+        "allergies": st.session_state.allergies,
+    })
+
+    with st.spinner("Peet is aan het kiezen…"):
+        st.session_state.result = call_peet(context)
+        st.session_state.days = effective_days
 
 #==========================================================
 # HELPERS
