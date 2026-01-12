@@ -22,6 +22,7 @@ from reportlab.pdfgen import canvas
 # IMPORTS CORE
 # =========================================================
 from core.prompts import PEET_KIEST_VOORUIT_PROMPT
+from core.images import generate_dish_image_bytes
 
 # =========================================================
 # CONFIG
@@ -65,58 +66,50 @@ if mode == "vandaag":
 else:
     effective_days = days if days in (2, 3, 5) else None
 
-# =========================================================
-# SESSION STATE (STABIELE DEFAULTS)
-# =========================================================
+# ============================================================
+# SESSION STATE — STABIELE DEFAULTS
+# ============================================================
 
 _defaults = {
-    "result": None,
     "people": 2,
     "veggie": False,
     "allergies": "",
-    "days": None,
+    "result": None,
     "last_request_key": None,
-    "last_query_key": None,
-    "is_generating": False,
 }
 
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# =========================================================
+# ============================================================
 # QUERY → STATE SYNC (ÉÉNMALIG PER URL)
-# =========================================================
+# ============================================================
 
-def _to_bool(v):
-    return str(v).strip().lower() in ("1", "true", "yes", "y", "on", "checked")
+query_params = st.query_params
 
-def _query_signature():
-    parts = []
-    for k in ("mode", "days", "people", "veggie", "allergies", "id"):
-        parts.append(f"{k}={first_value(k) or ''}")
-    return "&".join(parts)
+def _to_int(val, default):
+    try:
+        return int(val)
+    except Exception:
+        return default
 
-qkey = _query_signature()
+def _clean_text(val):
+    return val.strip() if isinstance(val, str) else ""
 
-if st.session_state.last_query_key != qkey:
-    st.session_state.last_query_key = qkey
+if st.session_state.result is None:
+    if "people" in query_params:
+        st.session_state.people = _to_int(
+            query_params.get("people"), st.session_state.people
+        )
 
-    if first_value("people") is not None:
-        try:
-            st.session_state.people = max(1, min(10, int(first_value("people"))))
-        except Exception:
-            pass
+    if "veggie" in query_params:
+        st.session_state.veggie = query_params.get("veggie") == "checked"
 
-    if first_value("veggie") is not None:
-        st.session_state.veggie = _to_bool(first_value("veggie"))
-
-    if first_value("allergies") is not None:
-        st.session_state.allergies = first_value("allergies")
-
-    st.session_state.result = None
-    st.session_state.days = None
-    st.session_state.last_request_key = None
+    if "allergies" in query_params:
+        st.session_state.allergies = _clean_text(
+            query_params.get("allergies")
+        )
 
 # =========================================================
 # HELPERS
@@ -146,86 +139,65 @@ people = st.session_state.people
 veggie = st.session_state.veggie
 allergies = st.session_state.allergies
 
-# =========================================================
-# INPUT VALIDATION + REQUEST KEY (SLUITEND)
-# =========================================================
+# ============================================================
+# INPUTS → VALIDATION → REQUEST KEY (SLUITEND)
+# ============================================================
+
 people = st.session_state.people
 veggie = st.session_state.veggie
 allergies = st.session_state.allergies
 
 inputs_ready = (
-    isinstance(people, int) and people > 0
-    and isinstance(veggie, bool)
-    and allergies is not None
-    and (
-        (mode == "vandaag" and effective_days == 1)
-        or (mode == "vooruit" and effective_days in (2, 3, 5))
-    )
+    isinstance(people, int)
+    and people > 0
 )
 
 request_payload = {
-    "mode": mode,
     "days": effective_days,
     "people": people,
     "veggie": veggie,
     "allergies": allergies,
 }
 
-request_key = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)
+request_key = json.dumps(request_payload, sort_keys=True)
+
+should_generate = (
+    inputs_ready
+    and request_key != st.session_state.last_request_key
+)
 
 # ============================================================
-# BOVENBLOK — TITEL + AFSTEMMEN
+# BOVENBLOK — EVEN AFSTEMMEN (UI)
 # ============================================================
-top_block = st.empty()
 
-with top_block.container():
-    title = "Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit"
-    st.title(title)
-    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
+st.subheader("Even afstemmen")
 
-    # UI mag altijd; state is de waarheid
-    st.markdown("## Even afstemmen")
+st.number_input(
+    "Voor hoeveel personen?",
+    min_value=1,
+    max_value=6,
+    step=1,
+    key="people"
+)
 
-    st.number_input(
-        "Voor hoeveel personen?",
-        min_value=1,
-        max_value=10,
-        value=people,
-        key="people",
-    )
+st.checkbox(
+    "Ben je vegetarisch?",
+    key="veggie"
+)
 
-    st.checkbox(
-        "Ben je vegetarisch?",
-        value=veggie,
-        key="veggie",
-    )
-
-    st.text_input(
-        "Allergieën of dingen die ik moet vermijden",
-        value=allergies,
-        key="allergies",
-    )
-
+st.text_input(
+    "Allergieën of dingen die ik moet vermijden",
+    key="allergies"
+)
 # ============================================================
 # ACTIE — AUTO-RUN (DETERMINISTISCH)
 # ============================================================
 
-should_generate = (
-    inputs_ready
-    and st.session_state.last_request_key != request_key
-    and not st.session_state.is_generating
-)
-
 if should_generate:
-    st.session_state.is_generating = True
-    try:
-        context = json.dumps(request_payload, ensure_ascii=False)
-        with st.spinner("Peet is aan het kiezen…"):
-            st.session_state.result = call_peet(context)
-            st.session_state.days = effective_days
-            st.session_state.last_request_key = request_key
-    finally:
-        st.session_state.is_generating = False
+    with st.spinner("Peet is aan het kiezen…"):
+        context = json.dumps(request_payload)
+        st.session_state.result = call_peet(context)
+        st.session_state.last_request_key = request_key
 
 # ============================================================
 # RESULT — UIT SESSION HALEN (SLUITEND)
