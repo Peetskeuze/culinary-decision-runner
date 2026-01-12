@@ -18,55 +18,6 @@ from openai import OpenAI
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-
-
-# =========================================================
-# PAGE CONFIG (MOET ALS EERSTE)
-# =========================================================
-st.set_page_config(
-    page_title="Peet Kiest – Vooruit",
-    layout="centered"
-)
-
-# =========================================================
-# ROUTER — MODE & EFFECTIVE DAYS
-# =========================================================
-query_params = st.query_params
-
-def first_value(key):
-    v = query_params.get(key)
-    if isinstance(v, list) and len(v) > 0 and v[0]:
-        return v[0]
-    return None
-
-mode = first_value("mode") or "vandaag"
-
-raw_days = first_value("days")
-days = int(raw_days) if raw_days and raw_days.isdigit() else None
-
-if mode not in ("vandaag", "vooruit"):
-    mode = "vandaag"
-
-if mode == "vandaag":
-    effective_days = 1
-else:
-    effective_days = days if days in (2, 3, 5) else 2
-
-# =========================================================
-# GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
-# =========================================================
-st.markdown("""
-<style>
-.block-container { max-width: 680px; padding-top: 2.5rem; padding-bottom: 3rem; }
-html, body, [class*="css"] { font-size: 17px; line-height: 1.55; }
-h1 { font-size: 1.9rem; font-weight: 600; margin-bottom: 0.9rem; }
-h2 { font-size: 1.4rem; font-weight: 600; margin-top: 2.2rem; margin-bottom: 0.6rem; }
-h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.6rem; }
-p { margin-bottom: 1.1rem; }
-.stButton > button { width: 100%; padding: 0.75rem; font-size: 1rem; border-radius: 6px; }
-</style>
-""", unsafe_allow_html=True)
-
 # =========================================================
 # IMPORTS CORE
 # =========================================================
@@ -78,9 +29,46 @@ from core.prompts import PEET_KIEST_VOORUIT_PROMPT
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
+
+# =========================================================
+# PAGE CONFIG (MOET ALS EERSTE)
+# =========================================================
+st.set_page_config(
+    page_title="Peet Kiest – Vooruit",
+    layout="centered"
+)
+
+# =========================================================
+# ROUTER — MODE & EFFECTIVE DAYS (SLUITEND)
+# =========================================================
+
+query_params = st.query_params
+
+def first_value(key):
+    v = query_params.get(key)
+    if isinstance(v, list) and v and v[0]:
+        return v[0]
+    return None
+
+raw_mode = first_value("mode")
+mode = raw_mode if raw_mode in ("vandaag", "vooruit") else "vooruit"
+
+raw_days = first_value("days")
+try:
+    days = int(raw_days) if raw_days is not None else None
+except Exception:
+    days = None
+
+if mode == "vandaag":
+    effective_days = 1
+else:
+    effective_days = days if days in (2, 3, 5) else None
+
 # =========================================================
 # SESSION STATE (STABIELE DEFAULTS)
 # =========================================================
+
 _defaults = {
     "result": None,
     "people": 2,
@@ -96,17 +84,50 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# =========================================================
+# QUERY → STATE SYNC (ÉÉNMALIG PER URL)
+# =========================================================
+
+def _to_bool(v):
+    return str(v).strip().lower() in ("1", "true", "yes", "y", "on", "checked")
+
+def _query_signature():
+    parts = []
+    for k in ("mode", "days", "people", "veggie", "allergies", "id"):
+        parts.append(f"{k}={first_value(k) or ''}")
+    return "&".join(parts)
+
+qkey = _query_signature()
+
+if st.session_state.last_query_key != qkey:
+    st.session_state.last_query_key = qkey
+
+    if first_value("people") is not None:
+        try:
+            st.session_state.people = max(1, min(10, int(first_value("people"))))
+        except Exception:
+            pass
+
+    if first_value("veggie") is not None:
+        st.session_state.veggie = _to_bool(first_value("veggie"))
+
+    if first_value("allergies") is not None:
+        st.session_state.allergies = first_value("allergies")
+
+    st.session_state.result = None
+    st.session_state.days = None
+    st.session_state.last_request_key = None
 
 # =========================================================
-# HELPERS — MOET VOOR ACTIE
+# HELPERS
 # =========================================================
+
 def _extract_json(text: str) -> dict:
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1:
         raise ValueError("Geen JSON gevonden in model-output.")
     return json.loads(text[start:end + 1])
-
 
 def call_peet(context: str) -> dict:
     resp = client.responses.create(
@@ -118,63 +139,6 @@ def call_peet(context: str) -> dict:
     )
     return _extract_json(resp.output_text)
 
-
-def _to_bool(v) -> bool:
-    if v is None:
-        return False
-    s = str(v).strip().lower()
-    return s in ("1", "true", "yes", "y", "on", "checked")
-
-
-def _to_int(v, default: int) -> int:
-    try:
-        n = int(str(v).strip())
-        return n
-    except Exception:
-        return default
-
-
-def _clean_text(v) -> str:
-    if v is None:
-        return ""
-    return str(v).strip()
-
-
-def _query_signature() -> str:
-    # Stabiliseer de URL-inhoud tot één sleutel (zodat we éénmalig syncen)
-    parts = []
-    for k in ("mode", "days", "people", "veggie", "allergies", "id"):
-        parts.append(f"{k}={first_value(k) or ''}")
-    return "&".join(parts)
-
-
-# =========================================================
-# QUERY → STATE SYNC (SLUITEND, ÉÉN KEER PER URL)
-# =========================================================
-qkey = _query_signature()
-if st.session_state.last_query_key != qkey:
-    st.session_state.last_query_key = qkey
-
-    # mode/days heb je al, maar people/veggie/allergies nu ook
-    q_people = first_value("people")
-    q_veggie = first_value("veggie")
-    q_allergies = first_value("allergies")
-
-    if q_people is not None:
-        st.session_state.people = max(1, min(10, _to_int(q_people, st.session_state.people)))
-
-    if q_veggie is not None:
-        st.session_state.veggie = _to_bool(q_veggie)
-
-    if q_allergies is not None:
-        st.session_state.allergies = _clean_text(q_allergies)
-
-    # Bij nieuwe URL wil je altijd opnieuw genereren
-    st.session_state.result = None
-    st.session_state.days = None
-    st.session_state.last_request_key = None
-
-
 # =========================================================
 # INPUTS — BRON VAN WAARHEID = SESSION_STATE
 # =========================================================
@@ -182,10 +146,23 @@ people = st.session_state.people
 veggie = st.session_state.veggie
 allergies = st.session_state.allergies
 
+# =========================================================
+# INPUT VALIDATION + REQUEST KEY (SLUITEND)
+# =========================================================
+people = st.session_state.people
+veggie = st.session_state.veggie
+allergies = st.session_state.allergies
 
-# =========================================================
-# REQUEST KEY — DIT IS DE SLUITENDE GUARD
-# =========================================================
+inputs_ready = (
+    isinstance(people, int) and people > 0
+    and isinstance(veggie, bool)
+    and allergies is not None
+    and (
+        (mode == "vandaag" and effective_days == 1)
+        or (mode == "vooruit" and effective_days in (2, 3, 5))
+    )
+)
+
 request_payload = {
     "mode": mode,
     "days": effective_days,
@@ -193,8 +170,8 @@ request_payload = {
     "veggie": veggie,
     "allergies": allergies,
 }
-request_key = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)
 
+request_key = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)
 
 # ============================================================
 # BOVENBLOK — TITEL + AFSTEMMEN
@@ -229,13 +206,14 @@ with top_block.container():
         key="allergies",
     )
 
+# ============================================================
+# ACTIE — AUTO-RUN (DETERMINISTISCH)
+# ============================================================
 
-# ============================================================
-# ACTIE — AUTO-RUN (SLUITEND)
-# ============================================================
 should_generate = (
-    (st.session_state.last_request_key != request_key)
-    and (not st.session_state.is_generating)
+    inputs_ready
+    and st.session_state.last_request_key != request_key
+    and not st.session_state.is_generating
 )
 
 if should_generate:
@@ -246,31 +224,22 @@ if should_generate:
             st.session_state.result = call_peet(context)
             st.session_state.days = effective_days
             st.session_state.last_request_key = request_key
-    except Exception as e:
-        # Toon iets bruikbaars, maar voorkom loop/crash
-        st.session_state.result = None
-        st.session_state.last_request_key = None
-        st.error(f"Er ging iets mis bij het kiezen. Probeer opnieuw. ({type(e).__name__})")
-        st.stop()
     finally:
         st.session_state.is_generating = False
 
 # ============================================================
-# RESULT — UIT SESSION HALEN
+# RESULT — UIT SESSION HALEN (SLUITEND)
 # ============================================================
 
 result = st.session_state.get("result")
-if result is None:
+
+if not result:
     st.stop()
 
-top_block.empty()
+days_data = result.get("days")
 
-days_data = result.get("days", [])
-
-result = st.session_state.get("result")
-if result is None:
+if not isinstance(days_data, list) or not days_data:
     st.stop()
-
 
 # =========================================================
 # RESULT CARDS
@@ -308,6 +277,24 @@ for day in days_data:
         "<div style='height: 1.5rem'></div>",
         unsafe_allow_html=True
     )
+
+
+
+
+# =========================================================
+# GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
+# =========================================================
+st.markdown("""
+<style>
+.block-container { max-width: 680px; padding-top: 2.5rem; padding-bottom: 3rem; }
+html, body, [class*="css"] { font-size: 17px; line-height: 1.55; }
+h1 { font-size: 1.9rem; font-weight: 600; margin-bottom: 0.9rem; }
+h2 { font-size: 1.4rem; font-weight: 600; margin-top: 2.2rem; margin-bottom: 0.6rem; }
+h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.6rem; }
+p { margin-bottom: 1.1rem; }
+.stButton > button { width: 100%; padding: 0.75rem; font-size: 1rem; border-radius: 6px; }
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # PDF MAKEN – FUNCTIES
