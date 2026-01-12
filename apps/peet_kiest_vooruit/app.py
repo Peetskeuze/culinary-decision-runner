@@ -93,6 +93,31 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# =========================================================
+# INPUTS — ALTIJD DEFINIËREN (OOK BIJ AUTO-RUN)
+# =========================================================
+
+people = st.session_state.people
+veggie = st.session_state.veggie
+allergies = st.session_state.allergies
+
+# =========================================================
+# GENERATION GUARD — DEFINITIEF
+# =========================================================
+
+should_generate = (
+    st.session_state.result is None
+    or st.session_state.days != effective_days
+)
+
+# =========================================================
+# INPUTS — ALTIJD BESCHIKBAAR
+# =========================================================
+
+people = st.session_state.people
+veggie = st.session_state.veggie
+allergies = st.session_state.allergies
+
 # ============================================================
 # BOVENBLOK — TITEL + AFSTEMMEN
 # ============================================================
@@ -165,30 +190,7 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
     except Exception:
         return None
 
-# ============================================================
-# ACTIE — AUTO-RUN ZODRA INPUTS KLOPPEN
-# ============================================================
 
-should_generate = (
-    st.session_state.result is None
-    or st.session_state.people != people
-    or st.session_state.veggie != veggie
-    or st.session_state.allergies != allergies
-    or st.session_state.days != effective_days
-)
-
-if should_generate:
-    context = json.dumps({
-        "mode": mode,
-        "days": effective_days,
-        "people": people,
-        "veggie": veggie,
-        "allergies": allergies,
-    })
-
-    with st.spinner("Peet is aan het kiezen…"):
-        st.session_state.result = call_peet(context)
-        st.session_state.days = effective_days
 
 # ============================================================
 # RESULT — UIT SESSION HALEN
