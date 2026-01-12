@@ -28,22 +28,19 @@ st.set_page_config(
 )
 
 # =========================================================
-# ROUTER — MODE & EFFECTIVE DAYS (DEFINITIEF)
+# ROUTER — MODE & EFFECTIVE DAYS
 # =========================================================
 query_params = st.query_params
 
-# Mode bepalen
-mode = query_params.get("mode", ["vooruit"])[0]
+mode = query_params.get("mode", ["vandaag"])[0]
 if mode not in ("vandaag", "vooruit"):
-    mode = "vooruit"
+    mode = "vandaag"
 
-# Days uit query halen (alleen relevant bij 'vooruit')
 try:
-    days_from_query = int(query_params.get("days", ["2"])[0])
+    days_from_query = int(query_params.get("days", ["1"])[0])
 except Exception:
-    days_from_query = 2
+    days_from_query = 1
 
-# Effectief aantal dagen vaststellen
 if mode == "vandaag":
     effective_days = 1
 else:
@@ -82,12 +79,13 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # =========================================================
 _defaults = {
     "result": None,
-    "dish_image_bytes": None,
-    "action": None,
-    "people": 2,
-    "veggie": False,
-    "allergies": "",
+    "people": None,
+    "veggie": None,
+    "allergies": None,
+    "days": None,
 }
+
+
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -132,73 +130,51 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
 # =========================================================
 st.title("Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit")
 st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
-# =========================================================
-# INPUTS
-# =========================================================
+
+st.subheader("Even afstemmen")
 
 people = st.number_input(
-    "Voor hoeveel personen kook je?",
+    "Voor hoeveel personen?",
     min_value=1,
     max_value=10,
-    value=st.session_state.people,
+    value=2,
     step=1
 )
 
-veggie = st.checkbox(
-    "Vegetarisch",
-    value=st.session_state.veggie
-)
+veggie = st.checkbox("Ben je vegetarisch?")
 
 allergies = st.text_input(
-    "Allergieën of dingen die ik moet vermijden?",
-    value=st.session_state.allergies,
+    "Allergieën of dingen die ik moet vermijden",
     placeholder="Bijvoorbeeld noten of schaal- en schelpdieren"
 )
 
 # =========================================================
-# ACTIEKNOPPEN
+# ACTIE — AUTO-RUN ZODRA INPUTS KLOPPEN
 # =========================================================
 
-col1, col2 = st.columns(2)
+should_generate = (
+    st.session_state.result is None
+    or st.session_state.people != people
+    or st.session_state.veggie != veggie
+    or st.session_state.allergies != allergies
+    or st.session_state.days != effective_days
+)
 
-with col1:
-    if st.button("Peet, kies", use_container_width=True):
-        st.session_state.people = people
-        st.session_state.veggie = veggie
-        st.session_state.allergies = allergies
-        st.session_state.action = "generate"
+if people >= 1 and should_generate:
+    context = {
+        "days": effective_days,
+        "people": people,
+        "vegetarian": veggie,
+        "allergies": allergies.strip()
+    }
 
-with col2:
-    if st.button("Opnieuw", use_container_width=True):
-        st.session_state.action = "reset"
-
-# =========================================================
-# ACTIE ROUTER
-# =========================================================
-
-action = st.session_state.get("action")
-
-if action == "reset":
-    st.session_state.clear()
-    st.query_params.clear()
-    st.rerun()
-
-if action == "generate":
-    context = f"""
-DATUM: {date.today().isoformat()}
-MODE: {mode}
-AANTAL DAGEN: {effective_days}
-AANTAL PERSONEN: {st.session_state.people}
-VEGETARISCH: {"Ja" if st.session_state.veggie else "Nee"}
-ALLERGIEËN: {st.session_state.allergies or "Geen"}
-STANDAARD TIJD: 30 minuten
-""".strip()
-
-    with st.spinner("Peet regelt het voor je…"):
-        st.session_state.result = call_peet(context)
-
-    st.session_state.action = None
-    st.rerun()
+    st.session_state.result = call_peet(
+        json.dumps(context, ensure_ascii=False)
+    )
+    st.session_state.people = people
+    st.session_state.veggie = veggie
+    st.session_state.allergies = allergies
+    st.session_state.days = effective_days
 
 # =========================================================
 # RESULT UIT SESSION HALEN
@@ -210,27 +186,29 @@ if result is None:
 days_data = result.get("days", [])
 
 # =========================================================
-# RESULT WEERGEVEN OP SCHERM
+# RESULT CARDS
 # =========================================================
 
 for day in days_data:
-    st.markdown(f"## Dag {day['day']}")
-    st.markdown(f"**{day['screen8']['dish_name']}**")
+    with st.container(border=True):
+        st.markdown(f"### Dag {day['day']}")
+        st.markdown(f"**{day['screen8']['dish_name']}**")
 
-    if day.get("description"):
-        st.markdown(day["description"])
+        if day.get("description"):
+            st.markdown(day["description"])
 
-    if day.get("motivation"):
-        st.caption(day["motivation"])
+        if day.get("motivation"):
+            st.caption(day["motivation"])
 
-    if st.button(f"Laat een foto zien (Dag {day['day']})", key=f"img_{day['day']}"):
-        with st.spinner("Even zoeken…"):
-            img = generate_dish_image_bytes(day["screen8"]["dish_name"])
-            if img:
-                st.image(img, width="stretch")
-
-    st.divider()
-
+        if st.button(
+            f"Laat een foto zien",
+            key=f"img_{day['day']}",
+            use_container_width=True
+        ):
+            with st.spinner("Even zoeken…"):
+                img = generate_dish_image_bytes(day["screen8"]["dish_name"])
+                if img:
+                    st.image(img, width="stretch")
 
 # =========================================================
 # PDF MAKEN – FUNCTIES
@@ -415,16 +393,20 @@ pdf_data = build_vooruit_pdf(days_data)
 shopping_list = build_combined_shopping_list(days_data)
 pdf_path = render_vooruit_pdf(pdf_data, shopping_list)
 
-
 # =========================================================
-# PDF DOWNLOAD KNOP (TOP-LEVEL)
+# PDF CARD
 # =========================================================
 
-if pdf_path:
-    with open(pdf_path, "rb") as f:
-        st.download_button(
-            label="Bekijk recept & boodschappen (PDF)",
-            data=f,
-            file_name=os.path.basename(pdf_path),
-            mime="application/pdf"
-        )
+with st.container(border=True):
+    st.markdown("### Alles bij elkaar")
+
+    if pdf_path:
+        with open(pdf_path, "rb") as f:
+            st.download_button(
+                label="Bekijk recept & boodschappen (PDF)",
+                data=f,
+                file_name=os.path.basename(pdf_path),
+                mime="application/pdf",
+                use_container_width=True
+            )
+
