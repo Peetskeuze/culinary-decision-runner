@@ -171,7 +171,7 @@ should_generate = (
     or st.session_state.days != effective_days
 )
 
-if people >= 1 and should_generate:
+if st.session_state.get("people", 2) >= 1 and should_generate:
     context = {
         "days": effective_days,
         "people": people,
