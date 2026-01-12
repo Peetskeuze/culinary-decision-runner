@@ -19,6 +19,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 
+
 # =========================================================
 # PAGE CONFIG (MOET ALS EERSTE)
 # =========================================================
@@ -32,21 +33,24 @@ st.set_page_config(
 # =========================================================
 query_params = st.query_params
 
-mode = query_params.get("mode", ["vandaag"])[0]
+def first_value(key):
+    v = query_params.get(key)
+    if isinstance(v, list) and len(v) > 0 and v[0]:
+        return v[0]
+    return None
+
+mode = first_value("mode") or "vandaag"
+
+raw_days = first_value("days")
+days = int(raw_days) if raw_days and raw_days.isdigit() else None
+
 if mode not in ("vandaag", "vooruit"):
     mode = "vandaag"
-
-try:
-    days_from_query = int(query_params.get("days", ["1"])[0])
-except Exception:
-    days_from_query = 1
 
 if mode == "vandaag":
     effective_days = 1
 else:
-    if days_from_query not in (2, 3, 5):
-        days_from_query = 2
-    effective_days = days_from_query
+    effective_days = days if days in (2, 3, 5) else 2
 
 # =========================================================
 # GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
@@ -89,6 +93,41 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# =========================================================
+# BOVENBLOK — TITEL + AFSTEMMEN
+# =========================================================
+top_block = st.empty()
+
+with top_block.container():
+
+    title = "Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit"
+    st.title(title)
+    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
+
+    st.subheader("Even afstemmen")
+
+    people = st.number_input(
+        "Voor hoeveel personen?",
+        min_value=1,
+        max_value=10,
+        value=st.session_state.people
+    )
+
+    veggie = st.checkbox(
+        "Ben je vegetarisch?",
+        value=st.session_state.veggie
+    )
+
+    allergies = st.text_input(
+        "Allergieën of dingen die ik moet vermijden",
+        value=st.session_state.allergies
+    )
+
+    st.session_state.people = people
+    st.session_state.veggie = veggie
+    st.session_state.allergies = allergies
+
+
 #==========================================================
 # HELPERS
 # =========================================================
@@ -124,43 +163,9 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
     except Exception:
         return None
 
-#
-# =========================================================
-# BOVENBLOK — TITEL + AFSTEMMEN (VERDWIJNT NA RESULTAAT)
-# =========================================================
-top_block = st.empty()
-
-with top_block:
-    st.title("Peet Kiest – Vandaag")
-    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
-
-    st.subheader("Even afstemmen")
-
-    people = st.number_input(
-        "Voor hoeveel personen?",
-        min_value=1,
-        max_value=10,
-        value=st.session_state.get("people", 2)
-    )
-
-    veggie = st.checkbox(
-        "Ben je vegetarisch?",
-        value=st.session_state.get("veggie", False)
-    )
-
-    allergies = st.text_input(
-        "Allergieën of dingen die ik moet vermijden",
-        value=st.session_state.get("allergies", "")
-    )
-
-    st.session_state["people"] = people
-    st.session_state["veggie"] = veggie
-    st.session_state["allergies"] = allergies
-
-
-# =========================================================
+# ============================================================
 # ACTIE — AUTO-RUN ZODRA INPUTS KLOPPEN
-# =========================================================
+# ============================================================
 
 should_generate = (
     st.session_state.result is None
@@ -170,24 +175,23 @@ should_generate = (
     or st.session_state.days != effective_days
 )
 
-# =========================================================
-# SESSION STATE (STABIELE DEFAULTS)
-# =========================================================
-_defaults = {
-    "result": None,
-    "people": 2,
-    "veggie": False,
-    "allergies": "",
-    "days": None,
-}
+if should_generate:
+    context = json.dumps({
+        "mode": mode,
+        "days": effective_days,
+        "people": people,
+        "veggie": veggie,
+        "allergies": allergies,
+    })
 
-for k, v in _defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    with st.spinner("Peet is aan het kiezen…"):
+        st.session_state.result = call_peet(context)
+        st.session_state.days = effective_days
 
-# =========================================================
-# RESULT UIT SESSION HALEN
-# =========================================================
+# ============================================================
+# RESULT — UIT SESSION HALEN
+# ============================================================
+
 result = st.session_state.get("result")
 if result is None:
     st.stop()
