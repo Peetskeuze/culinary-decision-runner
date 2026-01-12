@@ -304,6 +304,19 @@ Contexttaal hoort NOOIT in de schermbeschrijving.
 Alleen het gerecht spreekt.
 Begeleidende of geruststellende taal is alleen toegestaan buiten days[].description.
 
+TAALBEPERKING — HARD
+
+Gebruik geen woorden die het effect op de gebruiker beschrijven.
+Vermijd expliciet elke verwijzing naar:
+- rust (en varianten daarop)
+
+Beschrijf uitsluitend het gerecht zelf:
+- smaak
+- textuur
+- temperatuur
+- samenhang van onderdelen
+
+
 OUTPUTSTRUCTUUR — SCHERMBESCHRIJVING (VERPLICHT)
 
 Voor elke dag schrijf je een beschrijving van het gerecht voor weergave op het scherm.

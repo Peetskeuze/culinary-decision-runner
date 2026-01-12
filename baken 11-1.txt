@@ -1,0 +1,24 @@
+Ja. Gebruik dit als exacte hervat-zin 👇
+
+“Pak baken: Peet Kiest – Router & Keuzescherm v1 stabiel.”
+
+Wat dat baken betekent, zodat we allebei hetzelfde beeld hebben:
+
+Carrd → Streamlit routing werkt (mode=vandaag / mode=vooruit&days=2|3|5)
+
+Het lichte keuzescherm staat
+
+Knoppen linken correct door
+
+Streamlit toont nu alleen nog:
+
+aantal personen
+
+veggie ja/nee
+
+allergieën
+
+Resultaat wordt al gegenereerd, volgende stap is knoppen → directe output zonder extra formuliergedrag
+
+Morgen starten we daar 1-op-1 weer.
+Sluit ‘m af. Goede plek.

@@ -93,39 +93,41 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# =========================================================
+# ============================================================
 # BOVENBLOK — TITEL + AFSTEMMEN
-# =========================================================
+# ============================================================
+
 top_block = st.empty()
 
 with top_block.container():
-
     title = "Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit"
     st.title(title)
     st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
 
-    st.subheader("Even afstemmen")
+    if not should_generate:
+        st.markdown("## Even afstemmen")
 
-    people = st.number_input(
-        "Voor hoeveel personen?",
-        min_value=1,
-        max_value=10,
-        value=st.session_state.people
-    )
+        people = st.number_input(
+            "Voor hoeveel personen?",
+            min_value=1,
+            max_value=10,
+            value=st.session_state.get("people", 2),
+        )
 
-    veggie = st.checkbox(
-        "Ben je vegetarisch?",
-        value=st.session_state.veggie
-    )
+        veggie = st.checkbox(
+            "Ben je vegetarisch?",
+            value=st.session_state.get("veggie", False),
+        )
 
-    allergies = st.text_input(
-        "Allergieën of dingen die ik moet vermijden",
-        value=st.session_state.allergies
-    )
+        allergies = st.text_input(
+            "Allergieën of dingen die ik moet vermijden",
+            value=st.session_state.get("allergies", ""),
+        )
 
-    st.session_state.people = people
-    st.session_state.veggie = veggie
-    st.session_state.allergies = allergies
+        # ✅ ALLEEN hier wegschrijven
+        st.session_state.people = people
+        st.session_state.veggie = veggie
+        st.session_state.allergies = allergies
 
 
 #==========================================================
@@ -206,24 +208,36 @@ days_data = result.get("days", [])
 
 for day in days_data:
     with st.container(border=True):
+        # Titel
         st.markdown(f"### Dag {day['day']}")
         st.markdown(f"**{day['screen8']['dish_name']}**")
 
+        # Beschrijving
         if day.get("description"):
             st.markdown(day["description"])
 
+        # Motivatie (rustig, ondergeschikt)
         if day.get("motivation"):
             st.caption(day["motivation"])
 
+        # Afbeelding pas op expliciete actie
         if st.button(
-            f"Laat een foto zien",
+            "Laat een foto zien",
             key=f"img_{day['day']}",
             use_container_width=True
         ):
             with st.spinner("Even zoeken…"):
-                img = generate_dish_image_bytes(day["screen8"]["dish_name"])
+                img = generate_dish_image_bytes(
+                    day["screen8"]["dish_name"]
+                )
                 if img:
-                    st.image(img, width="stretch")
+                    st.image(img, use_container_width=True)
+
+    # Ruimte tussen cards
+    st.markdown(
+        "<div style='height: 1.5rem'></div>",
+        unsafe_allow_html=True
+    )
 
 # =========================================================
 # PDF MAKEN – FUNCTIES

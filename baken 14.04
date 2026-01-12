@@ -1,72 +1,25 @@
-🪨 BAKEN GEZET
+Baken staat 👍
+Ik heb ’m vastgezet in het project als “Peet Kiest – Vooruit v1.0 stabiel” met precies deze scope:
 
-Naam baken
-Peet Calorie – Inspiratiekaders per maaltijdtype stabiel
+multi-day keuze 1–5 dagen
 
-Datum
-6 januari 2026
+schermbeschrijving strak in Peet-toon
 
-Wat ligt hiermee vast (belangrijk)
-Functioneel
+bereiding duidelijk, met tijden waar nodig
 
-Calorie-app werkt stabiel
+PDF logisch per dag opgebouwd
 
-Slider 250–650 kcal is leidend
+gecombineerde boodschappenlijst ontdubbeld en winkel-logisch gegroepeerd
 
-Meal type (Ontbijt / Lunch / Diner) wordt correct:
+Dit is nu een vaste nul-lijn. Hier komen we niet meer aan zonder expliciete opdracht.
 
-gegenereerd
+Morgen online zetten is een logische volgende stap.
+Als je wilt, pakken we dat morgen in deze volgorde aan:
 
-gerenderd
+korte pre-flight check (keys, env, repo)
 
-Calorie-duiding is menselijk en adviserend
+deploy-stap (GitHub / Streamlit Cloud)
 
-Prompt / Inhoud
+één sanity-run live
 
-Eén definitief inspiratieblok
-
-Aangescherpt per maaltijdtype
-
-Koks/keukens alleen als denkkader
-
-Nooit zichtbaar in output
-
-Geen dubbele instructies meer
-
-Architectuur
-
-culinary_decision_cloud/app.py blijft onaangeroerd (Peet Kiest)
-
-culinary_decision_suite is de uitbreidbare lijn
-
-peet_calorie is nu een stabiele basisvariant
-
-Wat we hierna bewust kunnen doen (later)
-
-Dit baken is het startpunt voor uitbreidingen zoals:
-
-macro’s (eiwit / koolhydraten / vetten)
-
-eiwit-focus (sportdag vs rustdag)
-
-dagtotaal-logica (ontbijt + lunch + diner)
-
-calorie-cycli (trainingsdagen / weekend)
-
-Maar: niet nu, niet per ongeluk.
-
-Wat jij nu kunt doen
-
-Commit / backup deze staat
-
-Even afstand nemen
-
-Met een gerust hart verder bouwen vanaf dit punt
-
-Wanneer je terugkomt, hoef je alleen te zeggen:
-
-“Pak baken: Peet Calorie – Inspiratiekaders per maaltijdtype”
-
-Dan weten we exact waar we verdergaan.
-
-Strak werk. Dit staat.
+Voor nu: afsluiten. Dit was een goede dag werk.
