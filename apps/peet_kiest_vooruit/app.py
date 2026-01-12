@@ -87,6 +87,9 @@ _defaults = {
     "veggie": False,
     "allergies": "",
     "days": None,
+    "last_request_key": None,
+    "last_query_key": None,
+    "is_generating": False,
 }
 
 for k, v in _defaults.items():
@@ -95,77 +98,7 @@ for k, v in _defaults.items():
 
 
 # =========================================================
-# GENERATION GUARD — DEFINITIEF
-# =========================================================
-
-should_generate = (
-    st.session_state.result is None
-    or st.session_state.days != effective_days
-)
-
-# =========================================================
-# INPUTS — ALTIJD BESCHIKBAAR
-# =========================================================
-
-people = st.session_state.people
-veggie = st.session_state.veggie
-allergies = st.session_state.allergies
-
-# ============================================================
-# BOVENBLOK — TITEL + AFSTEMMEN
-# ============================================================
-
-top_block = st.empty()
-
-with top_block.container():
-    title = "Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit"
-    st.title(title)
-    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
-
-    if not should_generate:
-        st.markdown("## Even afstemmen")
-
-        people = st.number_input(
-            "Voor hoeveel personen?",
-            min_value=1,
-            max_value=10,
-            value=st.session_state.get("people", 2),
-        )
-
-        veggie = st.checkbox(
-            "Ben je vegetarisch?",
-            value=st.session_state.get("veggie", False),
-        )
-
-        allergies = st.text_input(
-            "Allergieën of dingen die ik moet vermijden",
-            value=st.session_state.get("allergies", ""),
-        )
-
-        # ✅ ALLEEN hier wegschrijven
-        st.session_state.people = people
-        st.session_state.veggie = veggie
-        st.session_state.allergies = allergies
-
-# ============================================================
-# ACTIE — AUTO-RUN
-# ============================================================
-
-if should_generate:
-    context = json.dumps({
-        "mode": mode,
-        "days": effective_days,
-        "people": st.session_state.people,
-        "veggie": st.session_state.veggie,
-        "allergies": st.session_state.allergies,
-    })
-
-    with st.spinner("Peet is aan het kiezen…"):
-        st.session_state.result = call_peet(context)
-        st.session_state.days = effective_days
-
-#==========================================================
-# HELPERS
+# HELPERS — MOET VOOR ACTIE
 # =========================================================
 def _extract_json(text: str) -> dict:
     start = text.find("{")
@@ -173,6 +106,7 @@ def _extract_json(text: str) -> dict:
     if start == -1 or end == -1:
         raise ValueError("Geen JSON gevonden in model-output.")
     return json.loads(text[start:end + 1])
+
 
 def call_peet(context: str) -> dict:
     resp = client.responses.create(
@@ -184,22 +118,142 @@ def call_peet(context: str) -> dict:
     )
     return _extract_json(resp.output_text)
 
-def generate_dish_image_bytes(dish_name: str) -> bytes | None:
+
+def _to_bool(v) -> bool:
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    return s in ("1", "true", "yes", "y", "on", "checked")
+
+
+def _to_int(v, default: int) -> int:
     try:
-        img = client.images.generate(
-            model="gpt-image-1",
-            prompt=(
-                f"Fotografisch realistisch gerecht: {dish_name}. "
-                "Warm natuurlijk licht, thuiskeuken, op een bord. "
-                "Geen tekst, geen mensen, geen handen, geen props."
-            ),
-            size="1024x1024",
-        )
-        return base64.b64decode(img.data[0].b64_json)
+        n = int(str(v).strip())
+        return n
     except Exception:
-        return None
+        return default
 
 
+def _clean_text(v) -> str:
+    if v is None:
+        return ""
+    return str(v).strip()
+
+
+def _query_signature() -> str:
+    # Stabiliseer de URL-inhoud tot één sleutel (zodat we éénmalig syncen)
+    parts = []
+    for k in ("mode", "days", "people", "veggie", "allergies", "id"):
+        parts.append(f"{k}={first_value(k) or ''}")
+    return "&".join(parts)
+
+
+# =========================================================
+# QUERY → STATE SYNC (SLUITEND, ÉÉN KEER PER URL)
+# =========================================================
+qkey = _query_signature()
+if st.session_state.last_query_key != qkey:
+    st.session_state.last_query_key = qkey
+
+    # mode/days heb je al, maar people/veggie/allergies nu ook
+    q_people = first_value("people")
+    q_veggie = first_value("veggie")
+    q_allergies = first_value("allergies")
+
+    if q_people is not None:
+        st.session_state.people = max(1, min(10, _to_int(q_people, st.session_state.people)))
+
+    if q_veggie is not None:
+        st.session_state.veggie = _to_bool(q_veggie)
+
+    if q_allergies is not None:
+        st.session_state.allergies = _clean_text(q_allergies)
+
+    # Bij nieuwe URL wil je altijd opnieuw genereren
+    st.session_state.result = None
+    st.session_state.days = None
+    st.session_state.last_request_key = None
+
+
+# =========================================================
+# INPUTS — BRON VAN WAARHEID = SESSION_STATE
+# =========================================================
+people = st.session_state.people
+veggie = st.session_state.veggie
+allergies = st.session_state.allergies
+
+
+# =========================================================
+# REQUEST KEY — DIT IS DE SLUITENDE GUARD
+# =========================================================
+request_payload = {
+    "mode": mode,
+    "days": effective_days,
+    "people": people,
+    "veggie": veggie,
+    "allergies": allergies,
+}
+request_key = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)
+
+
+# ============================================================
+# BOVENBLOK — TITEL + AFSTEMMEN
+# ============================================================
+top_block = st.empty()
+
+with top_block.container():
+    title = "Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit"
+    st.title(title)
+    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
+
+    # UI mag altijd; state is de waarheid
+    st.markdown("## Even afstemmen")
+
+    st.number_input(
+        "Voor hoeveel personen?",
+        min_value=1,
+        max_value=10,
+        value=people,
+        key="people",
+    )
+
+    st.checkbox(
+        "Ben je vegetarisch?",
+        value=veggie,
+        key="veggie",
+    )
+
+    st.text_input(
+        "Allergieën of dingen die ik moet vermijden",
+        value=allergies,
+        key="allergies",
+    )
+
+
+# ============================================================
+# ACTIE — AUTO-RUN (SLUITEND)
+# ============================================================
+should_generate = (
+    (st.session_state.last_request_key != request_key)
+    and (not st.session_state.is_generating)
+)
+
+if should_generate:
+    st.session_state.is_generating = True
+    try:
+        context = json.dumps(request_payload, ensure_ascii=False)
+        with st.spinner("Peet is aan het kiezen…"):
+            st.session_state.result = call_peet(context)
+            st.session_state.days = effective_days
+            st.session_state.last_request_key = request_key
+    except Exception as e:
+        # Toon iets bruikbaars, maar voorkom loop/crash
+        st.session_state.result = None
+        st.session_state.last_request_key = None
+        st.error(f"Er ging iets mis bij het kiezen. Probeer opnieuw. ({type(e).__name__})")
+        st.stop()
+    finally:
+        st.session_state.is_generating = False
 
 # ============================================================
 # RESULT — UIT SESSION HALEN
@@ -212,6 +266,11 @@ if result is None:
 top_block.empty()
 
 days_data = result.get("days", [])
+
+result = st.session_state.get("result")
+if result is None:
+    st.stop()
+
 
 # =========================================================
 # RESULT CARDS
