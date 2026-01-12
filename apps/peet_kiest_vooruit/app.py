@@ -125,28 +125,39 @@ def generate_dish_image_bytes(dish_name: str) -> bytes | None:
     except Exception:
         return None
 
+#
 # =========================================================
-# UI – HEADER
+# BOVENBLOK — TITEL + AFSTEMMEN (VERDWIJNT NA RESULTAAT)
 # =========================================================
-st.title("Peet Kiest – Vandaag" if mode == "vandaag" else "Peet Kiest – Vooruit")
-st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
+top_block = st.empty()
 
-st.subheader("Even afstemmen")
+with top_block:
+    st.title("Peet Kiest – Vandaag")
+    st.caption("Meerdere dagen geregeld. Geen planning. Geen stress.")
 
-people = st.number_input(
-    "Voor hoeveel personen?",
-    min_value=1,
-    max_value=10,
-    value=2,
-    step=1
-)
+    st.subheader("Even afstemmen")
 
-veggie = st.checkbox("Ben je vegetarisch?")
+    people = st.number_input(
+        "Voor hoeveel personen?",
+        min_value=1,
+        max_value=10,
+        value=st.session_state.get("people", 2)
+    )
 
-allergies = st.text_input(
-    "Allergieën of dingen die ik moet vermijden",
-    placeholder="Bijvoorbeeld noten of schaal- en schelpdieren"
-)
+    veggie = st.checkbox(
+        "Ben je vegetarisch?",
+        value=st.session_state.get("veggie", False)
+    )
+
+    allergies = st.text_input(
+        "Allergieën of dingen die ik moet vermijden",
+        value=st.session_state.get("allergies", "")
+    )
+
+    st.session_state["people"] = people
+    st.session_state["veggie"] = veggie
+    st.session_state["allergies"] = allergies
+
 
 # =========================================================
 # ACTIE — AUTO-RUN ZODRA INPUTS KLOPPEN
@@ -182,6 +193,8 @@ if people >= 1 and should_generate:
 result = st.session_state.get("result")
 if result is None:
     st.stop()
+
+top_block.empty()
 
 days_data = result.get("days", [])
 
