@@ -75,22 +75,21 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # =========================================================
-# SESSION STATE
+# SESSION STATE (STABIELE DEFAULTS)
 # =========================================================
 _defaults = {
     "result": None,
-    "people": None,
-    "veggie": None,
-    "allergies": None,
+    "people": 2,
+    "veggie": False,
+    "allergies": "",
     "days": None,
 }
-
 
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# =========================================================
+#==========================================================
 # HELPERS
 # =========================================================
 def _extract_json(text: str) -> dict:
@@ -171,21 +170,20 @@ should_generate = (
     or st.session_state.days != effective_days
 )
 
-if st.session_state.get("people", 2) >= 1 and should_generate:
-    context = {
-        "days": effective_days,
-        "people": people,
-        "vegetarian": veggie,
-        "allergies": allergies.strip()
-    }
+# =========================================================
+# SESSION STATE (STABIELE DEFAULTS)
+# =========================================================
+_defaults = {
+    "result": None,
+    "people": 2,
+    "veggie": False,
+    "allergies": "",
+    "days": None,
+}
 
-    st.session_state.result = call_peet(
-        json.dumps(context, ensure_ascii=False)
-    )
-    st.session_state.people = people
-    st.session_state.veggie = veggie
-    st.session_state.allergies = allergies
-    st.session_state.days = effective_days
+for k, v in _defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 # =========================================================
 # RESULT UIT SESSION HALEN
