@@ -40,37 +40,90 @@ st.set_page_config(
     layout="centered"
 )
 
-# =========================================================
-# ROUTER — MODE & EFFECTIVE DAYS (SLUITEND)
-# =========================================================
+# ============================================================
+# UI — GROTERE SPINNERTEKST
+# ============================================================
 
-query_params = st.query_params
-
-def first_value(key):
-    v = query_params.get(key)
-    if isinstance(v, list) and v and v[0]:
-        return v[0]
-    return None
-
-raw_mode = first_value("mode")
-mode = raw_mode if raw_mode in ("vandaag", "vooruit") else "vooruit"
-
-raw_days = first_value("days")
-try:
-    days = int(raw_days) if raw_days is not None else None
-except Exception:
-    days = None
-
-if mode == "vandaag":
-    effective_days = 1
-else:
-    effective_days = days if days in (2, 3, 5) else None
+st.markdown(
+    """
+    <style>
+    /* Spinner tekst */
+    div[data-testid="stSpinner"] > div > div {
+        font-size: 1.8rem;      /* pas aan: 1.2 / 1.4 / 1.6 */
+        font-weight: 500;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ============================================================
-# SESSION STATE — STABIELE DEFAULTS
+# CARRD → CONTEXT (ENIGE BRON) + SESSION STATE DEFAULTS
 # ============================================================
 
 _defaults = {
+    "mode": "vandaag",     # "vandaag" of "vooruit"
+    "days": 1,             # 1 / 2 / 3 / 5
+    "people": 2,           # 1..10
+    "veggie": False,       # True/False
+    "allergies": "",       # tekst
+    "result": None,
+    "last_request_key": None,
+}
+
+for k, v in _defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+params = st.query_params
+
+def _first(key: str, default: str) -> str:
+    v = params.get(key, [default])
+    return v[0] if isinstance(v, list) and v else default
+
+# Mode
+mode = _first("mode", st.session_state.mode)
+if mode not in ("vandaag", "vooruit"):
+    mode = "vandaag"
+
+# Days
+try:
+    days = int(_first("days", str(st.session_state.days)))
+except Exception:
+    days = 1
+if days not in (1, 2, 3, 5):
+    days = 1
+if mode == "vandaag":
+    days = 1
+
+# People
+try:
+    people = int(_first("people", str(st.session_state.people)))
+except Exception:
+    people = 2
+people = max(1, min(10, people))
+
+# Veggie
+veggie_raw = _first("veggie", "false").lower().strip()
+veggie = veggie_raw in ("true", "1", "yes", "y", "on")
+
+# Allergies
+allergies = _first("allergies", st.session_state.allergies).strip()
+
+# Schrijf alles weg naar session_state
+st.session_state.mode = mode
+st.session_state.days = days
+st.session_state.people = people
+st.session_state.veggie = veggie
+st.session_state.allergies = allergies
+
+# ============================================================
+# SESSION STATE — ENIGE BRON VAN WAARHEID
+# ============================================================
+
+_defaults = {
+    "mode": None,          # "vandaag" of "vooruit"
+    "days": None,          # 1 / 2 / 3 / 5
     "people": 2,
     "veggie": False,
     "allergies": "",
@@ -82,35 +135,7 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ============================================================
-# QUERY → STATE SYNC (ÉÉNMALIG PER URL)
-# ============================================================
-
-query_params = st.query_params
-
-def _to_int(val, default):
-    try:
-        return int(val)
-    except Exception:
-        return default
-
-def _clean_text(val):
-    return val.strip() if isinstance(val, str) else ""
-
-if st.session_state.result is None:
-    if "people" in query_params:
-        st.session_state.people = _to_int(
-            query_params.get("people"), st.session_state.people
-        )
-
-    if "veggie" in query_params:
-        st.session_state.veggie = query_params.get("veggie") == "checked"
-
-    if "allergies" in query_params:
-        st.session_state.allergies = _clean_text(
-            query_params.get("allergies")
-        )
-
+#
 # =========================================================
 # HELPERS
 # =========================================================
@@ -132,6 +157,60 @@ def call_peet(context: str) -> dict:
     )
     return _extract_json(resp.output_text)
 
+# ============================================================
+# GENERATE — DIRECT NA CARRD SUBMIT (ZONDER FORMULIER)
+# ============================================================
+
+# Als iemand de Streamlit URL opent zónder Carrd-parameters, doen we niks.
+# (Dan kan je eventueel een nette melding tonen.)
+required_present = ("mode" in st.query_params) and ("days" in st.query_params)
+
+if not required_present:
+    st.info("Open deze pagina via Carrd. Daar vul je alles in en druk je op submit.")
+    st.stop()
+
+request_key = json.dumps(
+    {
+        "mode": st.session_state.mode,
+        "days": st.session_state.days,
+        "people": st.session_state.people,
+        "veggie": st.session_state.veggie,
+        "allergies": st.session_state.allergies,
+    },
+    sort_keys=True
+)
+
+# Alleen opnieuw genereren als de request echt anders is
+if st.session_state.last_request_key != request_key:
+    st.session_state.result = None
+    st.session_state.last_request_key = request_key
+
+# Zolang er nog geen resultaat is: spinner + call
+if st.session_state.result is None:
+    try:
+        with st.spinner("Peet is aan het kiezen…"):
+            context = json.dumps(
+                {
+                    "mode": st.session_state.mode,
+                    "days": st.session_state.days,
+                    "people": st.session_state.people,
+                    "veggie": st.session_state.veggie,
+                    "allergies": st.session_state.allergies,
+                },
+                ensure_ascii=False
+            )
+            st.session_state.result = call_peet(context)
+    except Exception as e:
+        # Jip-en-Janneke foutmelding, zonder trace-spam
+        msg = str(e)
+        if "insufficient_quota" in msg or "429" in msg:
+            st.error("Ik kan nu even geen keuze maken omdat de API-limiet op is. Probeer later opnieuw.")
+        else:
+            st.error("Er ging iets mis bij het kiezen. Probeer nog een keer.")
+        st.stop()
+
+result = st.session_state.result
+
 # =========================================================
 # INPUTS — BRON VAN WAARHEID = SESSION_STATE
 # =========================================================
@@ -139,65 +218,7 @@ people = st.session_state.people
 veggie = st.session_state.veggie
 allergies = st.session_state.allergies
 
-# ============================================================
-# INPUTS → VALIDATION → REQUEST KEY (SLUITEND)
-# ============================================================
 
-people = st.session_state.people
-veggie = st.session_state.veggie
-allergies = st.session_state.allergies
-
-inputs_ready = (
-    isinstance(people, int)
-    and people > 0
-)
-
-request_payload = {
-    "days": effective_days,
-    "people": people,
-    "veggie": veggie,
-    "allergies": allergies,
-}
-
-request_key = json.dumps(request_payload, sort_keys=True)
-
-should_generate = (
-    inputs_ready
-    and request_key != st.session_state.last_request_key
-)
-
-# ============================================================
-# BOVENBLOK — EVEN AFSTEMMEN (UI)
-# ============================================================
-
-st.subheader("Even afstemmen")
-
-st.number_input(
-    "Voor hoeveel personen?",
-    min_value=1,
-    max_value=6,
-    step=1,
-    key="people"
-)
-
-st.checkbox(
-    "Ben je vegetarisch?",
-    key="veggie"
-)
-
-st.text_input(
-    "Allergieën of dingen die ik moet vermijden",
-    key="allergies"
-)
-# ============================================================
-# ACTIE — AUTO-RUN (DETERMINISTISCH)
-# ============================================================
-
-if should_generate:
-    with st.spinner("Peet is aan het kiezen…"):
-        context = json.dumps(request_payload)
-        st.session_state.result = call_peet(context)
-        st.session_state.last_request_key = request_key
 
 # ============================================================
 # RESULT — UIT SESSION HALEN (SLUITEND)
