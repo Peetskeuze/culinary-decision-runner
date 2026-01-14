@@ -83,7 +83,7 @@ def _extract_json(text: str) -> dict:
 def call_peet(context: str) -> dict:
     resp = client.responses.create(
         model=MODEL,
-        temperature=0.8,
+        temperature=0.2,
         input=[
             {
                 "role": "user",
@@ -93,7 +93,6 @@ def call_peet(context: str) -> dict:
     )
 
     return _extract_json(resp.output_text)
-
 
 # ============================================================
 # CARRD → QUERY PARAMS (ROBUST) + AUTO-RUN (NOOIT WIT SCHERM)
