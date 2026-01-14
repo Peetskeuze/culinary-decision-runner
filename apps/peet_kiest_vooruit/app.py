@@ -100,7 +100,7 @@ def call_peet(context: str) -> dict:
 # ============================================================
 
 st.title("Peet is aan het kiezen")
-st.write("Goede keuze. Ik regel de rest.")
+st.write("We hebben meer dan 1 miljoen recepten, dus het kan ff duren. Geen stress, Peet regelt het.")
 
 params = st.query_params
 
