@@ -84,7 +84,6 @@ def call_peet(context: str) -> dict:
     resp = client.responses.create(
         model=MODEL,
         temperature=0.8,
-        frequency_penalty=0.6,
         input=[
             {
                 "role": "user",
