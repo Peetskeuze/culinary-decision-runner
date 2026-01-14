@@ -24,21 +24,6 @@ from reportlab.pdfgen import canvas
 from core.prompts import PEET_KIEST_VOORUIT_PROMPT
 from core.images import generate_dish_image_bytes
 
-# =========================================================
-# HARD ENTRY GATE — ONLY ALLOW CARRD
-# =========================================================
-
-import streamlit as st
-
-query_params = st.query_params
-
-# Carrd always sends id=form01
-entry_id = query_params.get("id", [None])[0]
-
-if entry_id != "form01":
-    # Silent exit: no UI, no message, no Streamlit banner
-    st.stop()
-
 
 # =========================================================
 # CONFIG
