@@ -88,12 +88,13 @@ def call_peet(context: str) -> dict:
         input=[
             {
                 "role": "user",
-                "content": prompt_text
+                "content": context
             }
         ]
     )
 
     return _extract_json(resp.output_text)
+
 
 # ============================================================
 # CARRD → QUERY PARAMS (ROBUST) + AUTO-RUN (NOOIT WIT SCHERM)
