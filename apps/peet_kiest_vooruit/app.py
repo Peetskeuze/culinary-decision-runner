@@ -56,6 +56,16 @@ st.set_page_config(
     layout="centered"
 )
 
+# =========================================================
+# SESSION STATE INIT — VERPLICHT VOOR EERSTE RUN
+# =========================================================
+
+if "last_request_key" not in st.session_state:
+    st.session_state.last_request_key = None
+
+if "result" not in st.session_state:
+    st.session_state.result = None
+
 # ============================================================
 # UI — GROTERE SPINNERTEKST
 # ============================================================
