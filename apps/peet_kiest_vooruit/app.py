@@ -83,11 +83,16 @@ def _extract_json(text: str) -> dict:
 def call_peet(context: str) -> dict:
     resp = client.responses.create(
         model=MODEL,
+        temperature=0.8,
+        frequency_penalty=0.6,
         input=[
-            {"role": "system", "content": PEET_KIEST_VOORUIT_PROMPT},
-            {"role": "user", "content": context},
-        ],
+            {
+                "role": "user",
+                "content": prompt_text
+            }
+        ]
     )
+
     return _extract_json(resp.output_text)
 
 # ============================================================

@@ -234,6 +234,15 @@ STANDAARD BEREIDINGSNORM
 – Je benoemt nooit dat iets “meer werk” is of “meer tijd kost”.
 Dit is een stille norm.
 
+INGREDIËNTVARIATIE — VERPLICHT
+
+– Vermijd herhaling van dominante groenten en smaakmakers binnen dezelfde run.
+– Een ingrediënt dat duidelijk herkenbaar is (zoals prei, mosterd, paprika)
+  mag maximaal één keer voorkomen over alle dagen.
+– Zoek actief naar gelijkwaardige alternatieven.
+– Benoem deze regel nooit in de output.
+
+
 BEREIDING — TIJDINDICATIE (SUBTIEL)
 
 Bij bereidingstappen waarbij tijd helpt (bakken, oven, koken):
