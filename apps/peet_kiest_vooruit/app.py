@@ -86,6 +86,10 @@ def call_peet(context: str) -> dict:
         temperature=0.2,
         input=[
             {
+                "role": "system",
+                "content": PEET_KIEST_VOORUIT_PROMPT.strip()
+            },
+            {
                 "role": "user",
                 "content": context
             }
