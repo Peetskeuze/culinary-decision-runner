@@ -25,6 +25,22 @@ from core.prompts import PEET_KIEST_VOORUIT_PROMPT
 from core.images import generate_dish_image_bytes
 
 # =========================================================
+# HARD ENTRY GATE — ONLY ALLOW CARRD
+# =========================================================
+
+import streamlit as st
+
+query_params = st.query_params
+
+# Carrd always sends id=form01
+entry_id = query_params.get("id", [None])[0]
+
+if entry_id != "form01":
+    # Silent exit: no UI, no message, no Streamlit banner
+    st.stop()
+
+
+# =========================================================
 # CONFIG
 # =========================================================
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
@@ -57,84 +73,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ============================================================
-# CARRD → CONTEXT (ENIGE BRON) + SESSION STATE DEFAULTS
-# ============================================================
-
-_defaults = {
-    "mode": "vandaag",     # "vandaag" of "vooruit"
-    "days": 1,             # 1 / 2 / 3 / 5
-    "people": 2,           # 1..10
-    "veggie": False,       # True/False
-    "allergies": "",       # tekst
-    "result": None,
-    "last_request_key": None,
-}
-
-for k, v in _defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-params = st.query_params
-
-def _first(key: str, default: str) -> str:
-    v = params.get(key, [default])
-    return v[0] if isinstance(v, list) and v else default
-
-# Mode
-mode = _first("mode", st.session_state.mode)
-if mode not in ("vandaag", "vooruit"):
-    mode = "vandaag"
-
-# Days
-try:
-    days = int(_first("days", str(st.session_state.days)))
-except Exception:
-    days = 1
-if days not in (1, 2, 3, 5):
-    days = 1
-if mode == "vandaag":
-    days = 1
-
-# People
-try:
-    people = int(_first("people", str(st.session_state.people)))
-except Exception:
-    people = 2
-people = max(1, min(10, people))
-
-# Veggie
-veggie_raw = _first("veggie", "false").lower().strip()
-veggie = veggie_raw in ("true", "1", "yes", "y", "on")
-
-# Allergies
-allergies = _first("allergies", st.session_state.allergies).strip()
-
-# Schrijf alles weg naar session_state
-st.session_state.mode = mode
-st.session_state.days = days
-st.session_state.people = people
-st.session_state.veggie = veggie
-st.session_state.allergies = allergies
-
-# ============================================================
-# SESSION STATE — ENIGE BRON VAN WAARHEID
-# ============================================================
-
-_defaults = {
-    "mode": None,          # "vandaag" of "vooruit"
-    "days": None,          # 1 / 2 / 3 / 5
-    "people": 2,
-    "veggie": False,
-    "allergies": "",
-    "result": None,
-    "last_request_key": None,
-}
-
-for k, v in _defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
 #
 # =========================================================
 # HELPERS
@@ -158,16 +96,53 @@ def call_peet(context: str) -> dict:
     return _extract_json(resp.output_text)
 
 # ============================================================
-# GENERATE — DIRECT NA CARRD SUBMIT (ZONDER FORMULIER)
+# CARRD → QUERY PARAMS (ALTIJD VERDER, NOOIT BLOKKEREN)
 # ============================================================
 
-# Als iemand de Streamlit URL opent zónder Carrd-parameters, doen we niks.
-# (Dan kan je eventueel een nette melding tonen.)
-required_present = ("mode" in st.query_params) and ("days" in st.query_params)
+params = st.query_params
 
-if not required_present:
-    st.info("Open deze pagina via Carrd. Daar vul je alles in en druk je op submit.")
-    st.stop()
+def _first(key: str, default: str) -> str:
+    v = params.get(key, [default])
+    return v[0] if isinstance(v, list) and v else default
+
+# Mode (optioneel, fallback = vandaag)
+mode = _first("mode", "vandaag")
+if mode not in ("vandaag", "vooruit"):
+    mode = "vandaag"
+
+# Days (Carrd: days)
+try:
+    days = int(_first("days", "2"))
+except Exception:
+    days = 2
+if days not in (1, 2, 3, 5):
+    days = 2
+if mode == "vandaag":
+    days = 1
+
+# People (Carrd: persons)
+try:
+    people = int(_first("persons", "2"))
+except Exception:
+    people = 2
+people = max(1, min(10, people))
+
+# Veggie (Carrd: vegetarian)
+veggie_raw = _first("vegetarian", "false").lower().strip()
+veggie = veggie_raw in ("true", "1", "yes", "y", "on")
+
+# Allergies (Carrd: allergies)
+allergies = _first("allergies", "").strip()
+
+# ============================================================
+# SESSION STATE = ENIGE BRON VAN WAARHEID
+# ============================================================
+
+st.session_state.mode = mode
+st.session_state.days = days
+st.session_state.people = people
+st.session_state.veggie = veggie
+st.session_state.allergies = allergies
 
 request_key = json.dumps(
     {
