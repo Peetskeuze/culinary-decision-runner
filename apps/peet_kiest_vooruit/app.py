@@ -94,8 +94,8 @@ def call_peet(context: str) -> dict:
 # CARRD → QUERY PARAMS (ROBUST) + AUTO-RUN (NOOIT WIT SCHERM)
 # ============================================================
 
-st.title("Peet kiest vooruit")
-st.write("Kies wat bij je past. Ik regel de rest.")
+st.title("Peet is aan het kiezen")
+st.write("Goede keuze. Ik regel de rest.")
 
 params = st.query_params
 

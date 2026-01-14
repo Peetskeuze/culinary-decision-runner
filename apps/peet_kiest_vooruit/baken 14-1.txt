@@ -1,0 +1,175 @@
+Wat er niet klopt aan de eerdere conclusie
+
+We hebben nog géén bewezen, robuuste manier waarop Carrd Streamlit betrouwbaar triggert.
+
+Het “guard-fix” verhaal is te vroeg als startpunt.
+
+Het testje (2 dagen → 1 dag) was:
+
+technisch verklaarbaar
+
+maar functioneel onacceptabel
+
+En belangrijker:
+👉 het gaf geen vertrouwen, terwijl dat precies het doel was.
+
+Daar heb jij volledig gelijk in.
+
+De kern van het probleem (terug naar essentie)
+
+Wat jij uiteindelijk wilt is extreem simpel:
+
+Carrd = professionele voorkant
+Streamlit = resultaatmachine
+
+En concreet:
+
+Carrd geeft een paar keuzes
+
+Streamlit toont alleen:
+
+het gerecht
+
+eventueel meerdere dagen
+
+een downloadknop
+
+Geen formulieren, geen validatie, geen blokkades
+
+Dus de echte vraag is niet:
+
+“Hoe maken we dit form werkend?”
+
+maar:
+
+Kan Carrd Streamlit überhaupt starten met parameters, zónder forms?
+
+Dat is de juiste vraag. 👍
+
+Het eerlijke antwoord (belangrijk)
+❌ Carrd Forms zijn hier het verkeerde middel
+
+Niet omdat jij iets fout doet, maar omdat:
+
+Carrd Forms:
+
+eisen altijd een “volledige submit”
+
+hebben verplichte velden (zelfs als ze optioneel lijken)
+
+gedragen zich inconsistent met checkboxes
+
+Dat maakt ze onbetrouwbaar voor logica-overdracht
+
+👉 Dit verklaart alles wat je zag
+👉 Dit is geen gebruikersfout en geen denkfout van jou
+
+De juiste richting (out of the box, zoals je vroeg)
+✅ Oplossing die wél past bij jouw doel
+
+Geen forms. Geen submit. Geen validatie.
+
+Alleen dit:
+
+Carrd doet:
+
+Knoppen met directe links
+
+Bijvoorbeeld:
+
+https://peet-kiest-vooruit.streamlit.app/?mode=vooruit&days=2&persons=2
+
+Streamlit doet:
+
+Leest alleen query_params
+
+Genereert direct
+
+Toont:
+
+Dag 1, Dag 2, …
+
+Downloadknop
+
+Klaar
+
+Dat kan Carrd.
+Dat kan Streamlit.
+En dit is precies waarvoor Carrd wél geschikt is.
+
+Waarom het testje nu “raar” uitkwam (1 dag i.p.v. 2)
+
+Dat lag niet aan Carrd.
+Dat lag niet aan jouw idee.
+Dat lag aan:
+
+hergebruik van session_state
+
+eerdere guards
+
+en een nog niet opgeschoonde router
+
+Dat is technisch oplosbaar — maar pas nadat we de keten vereenvoudigen.
+
+Wat ik voorstel (stap 0, niet stap 10)
+
+We doen één mini-test. Geen discussie. Geen UI. Geen Carrd-gedoe.
+
+Testdoel
+
+Bewijzen dat één link → meerdere dagen output geeft
+
+Testlink (handmatig in browser):
+https://peet-kiest-vooruit.streamlit.app/?mode=vooruit&days=2&persons=2
+
+Verwachting:
+
+Dag 1
+
+Dag 2
+
+Downloadknop
+
+Geen formulieren
+
+Geen melding “open via Carrd”
+
+Als dit niet klopt → stoppen we hier en herzien we de Streamlit-logica.
+Als dit wel klopt → pas dán bouwen we Carrd eromheen.
+
+Belangrijk om te zeggen
+
+Je frustratie is terecht.
+Je gevoel “dit is toch niet zo complex” klopt ook.
+Het is niet complex — maar het werd complex doordat we een verkeerd Carrd-mechanisme gebruikten.
+
+Dat corrigeren we nu.
+
+Als je wilt, pakken we dit heel strak aan:
+1 stap
+1 test
+1 uitkomst
+
+Zeg maar:
+
+“Oké, laten we alleen die ene URL-test doen.”
+
+Startpunt vastgelegd: Carrd ↔ Streamlit startpunt herijkt
+
+Wat hiermee expliciet is vastgezet:
+
+We hebben nog geen bewezen, robuuste manier om Streamlit vanuit Carrd te starten.
+
+Carrd Forms zijn ongeschikt voor dit doel en hebben het vertrouwen ondermijnd.
+
+Het eerdere testje was bedoeld om vertrouwen te herwinnen, maar gaf een verklaarbaar, niet acceptabel resultaat.
+
+De juiste volgorde is:
+
+Eerst bewijzen dat Streamlit zelfstandig correct werkt via een handmatige URL (mode=vooruit, days>1).
+
+Pas daarna Carrd inzetten als simpele launcher (buttons/links), zonder forms, submit of validatie.
+
+Carrd is voorkant en routing, Streamlit is pure output (gerecht + download).
+
+Wanneer je straks weer verder wilt, kunnen we exact vanaf dit startpunt doorgaan, zonder aannames of shortcuts.
