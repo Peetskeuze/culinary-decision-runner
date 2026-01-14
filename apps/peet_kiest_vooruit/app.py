@@ -91,42 +91,65 @@ def call_peet(context: str) -> dict:
     return _extract_json(resp.output_text)
 
 # ============================================================
-# CARRD → QUERY PARAMS (ALTIJD VERDER, NOOIT BLOKKEREN)
+# CARRD → QUERY PARAMS (ROBUST) + AUTO-RUN (NOOIT WIT SCHERM)
 # ============================================================
+
+st.title("Peet kiest vooruit")
+st.write("Kies wat bij je past. Ik regel de rest.")
 
 params = st.query_params
 
 def _first(key: str, default: str) -> str:
-    v = params.get(key, [default])
-    return v[0] if isinstance(v, list) and v else default
+    """
+    Streamlit kan query params als str of als list[str] teruggeven.
+    Deze helper pakt altijd de 'eerste' waarde.
+    """
+    v = params.get(key, default)
+    if isinstance(v, list):
+        return v[0] if v else default
+    return v if v is not None else default
 
-# Mode (optioneel, fallback = vandaag)
-mode = _first("mode", "vandaag")
-if mode not in ("vandaag", "vooruit"):
-    mode = "vandaag"
-
-# Days (Carrd: days)
+# --- Days (Carrd: days) ---
+# Carrd stuurt days=2|3|5. Als days ontbreekt: default 2.
 try:
-    days = int(_first("days", "2"))
+    days_from_query = int(_first("days", "2"))
+except Exception:
+    days_from_query = 2
+
+# Normaliseer days alvast
+if days_from_query not in (1, 2, 3, 5):
+    days_from_query = 2
+
+# --- Mode ---
+# We willen GEEN verplichte mode. Als mode ontbreekt: afleiden op basis van days.
+mode_raw = _first("mode", "").strip().lower()
+if mode_raw in ("vandaag", "vooruit"):
+    mode = mode_raw
+else:
+    mode = "vooruit" if days_from_query in (2, 3, 5) else "vandaag"
+
+# Effective days — leidend op days uit query
+try:
+    days = int(days_from_query)
 except Exception:
     days = 2
+
 if days not in (1, 2, 3, 5):
     days = 2
-if mode == "vandaag":
-    days = 1
 
-# People (Carrd: persons)
+# --- People (Carrd: persons) ---
 try:
     people = int(_first("persons", "2"))
 except Exception:
     people = 2
 people = max(1, min(10, people))
 
-# Veggie (Carrd: vegetarian)
-veggie_raw = _first("vegetarian", "false").lower().strip()
-veggie = veggie_raw in ("true", "1", "yes", "y", "on")
+# --- Veggie (Carrd: vegetarian) ---
+# Carrd checkbox kan o.a. "checked" of "on" sturen.
+veggie_raw = _first("vegetarian", "false").strip().lower()
+veggie = veggie_raw in ("true", "1", "yes", "y", "on", "checked")
 
-# Allergies (Carrd: allergies)
+# --- Allergies (Carrd: allergies) ---
 allergies = _first("allergies", "").strip()
 
 # ============================================================
@@ -155,7 +178,10 @@ if st.session_state.last_request_key != request_key:
     st.session_state.result = None
     st.session_state.last_request_key = request_key
 
-# Zolang er nog geen resultaat is: spinner + call
+# ============================================================
+# AUTO-RUN: als er nog geen resultaat is -> call_peet
+# ============================================================
+
 if st.session_state.result is None:
     try:
         with st.spinner("Peet is aan het kiezen…"):
@@ -171,37 +197,36 @@ if st.session_state.result is None:
             )
             st.session_state.result = call_peet(context)
     except Exception as e:
-        # Jip-en-Janneke foutmelding, zonder trace-spam
         msg = str(e)
         if "insufficient_quota" in msg or "429" in msg:
             st.error("Ik kan nu even geen keuze maken omdat de API-limiet op is. Probeer later opnieuw.")
+        elif "api_key" in msg.lower() or "authentication" in msg.lower():
+            st.error("De app kan OpenAI niet gebruiken: check je Streamlit Secrets (OPENAI_API_KEY).")
         else:
             st.error("Er ging iets mis bij het kiezen. Probeer nog een keer.")
+        with st.expander("Technische info (handig voor debug)", expanded=False):
+            st.write("Query params:")
+            st.write(dict(params))
+            st.write("Foutmelding:")
+            st.write(msg)
         st.stop()
 
-result = st.session_state.result
-
-# =========================================================
-# INPUTS — BRON VAN WAARHEID = SESSION_STATE
-# =========================================================
-people = st.session_state.people
-veggie = st.session_state.veggie
-allergies = st.session_state.allergies
-
-
-
 # ============================================================
-# RESULT — UIT SESSION HALEN (SLUITEND)
+# RESULT VALIDATIE (NOOIT STIL STOPPEN)
 # ============================================================
 
 result = st.session_state.get("result")
-
-if not result:
+if not isinstance(result, dict):
+    st.error("Ik kreeg geen bruikbaar resultaat terug. Probeer nog eens.")
+    with st.expander("Technische info", expanded=False):
+        st.write(result)
     st.stop()
 
 days_data = result.get("days")
-
 if not isinstance(days_data, list) or not days_data:
+    st.error("Ik kreeg een resultaat terug, maar niet in het verwachte formaat.")
+    with st.expander("Technische info (resultaat)", expanded=False):
+        st.json(result)
     st.stop()
 
 # =========================================================
