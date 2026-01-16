@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# --- Project root bootstrap (Cloud + lokaal) ---
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 # =========================================================
 # STREAMLIT CLOUD IMPORT BOOTSTRAP (ALLEEN PAD-FIX)
 # Doel: projectroot altijd in sys.path, zodat imports overal werken (Cloud + lokaal)
@@ -182,10 +190,8 @@ Plaats die NA het JSON-object, niet erin.
 """.strip()
 
     # Stap 5 — LLM
-    result = call_peet(
-        system_context=context_text,
-        user_prompt=user_prompt,
-    )
+    result = call_peet(context_text)
+
 
 
 # =========================================================
