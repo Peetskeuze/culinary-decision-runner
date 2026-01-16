@@ -1,3 +1,29 @@
+# =========================================================
+# STREAMLIT CLOUD IMPORT BOOTSTRAP (ALLEEN PAD-FIX)
+# Doel: projectroot altijd in sys.path, zodat imports overal werken (Cloud + lokaal)
+# =========================================================
+import os
+import sys
+from pathlib import Path
+
+def _bootstrap_project_root() -> None:
+    # Dit bestand = C:\culinary_decision_suite\app.py
+    # Root = map waar dit bestand in staat
+    root = Path(__file__).resolve().parent
+
+    # Werkdirectory gelijkzetten (helpt bij relatieve paden)
+    try:
+        os.chdir(root)
+    except Exception:
+        pass
+
+    # Root vóóraan in sys.path (zodat "apps", "core", "shared", etc. gevonden worden)
+    root_str = str(root)
+    if root_str not in sys.path:
+        sys.path.insert(0, root_str)
+
+_bootstrap_project_root()
+
 import streamlit as st
 from datetime import date
 
