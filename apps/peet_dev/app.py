@@ -3,10 +3,41 @@ import streamlit as st
 st.set_page_config(
     page_title="Peet DEV — niet voor testers",
     page_icon="🧪"
+=======
+# =========================================================
+# PEET DEV APP
+# Doel: veilige ontwikkelomgeving
+# - Output identiek aan stabiele app
+# - Input-gateway voorbereid (nog niet actief)
+# - NIET delen met testers
+# =========================================================
+
+import os
+import sys
+from pathlib import Path
+import streamlit as st
+
+# ---------------------------------------------------------
+# PROJECT ROOT BOOTSTRAP (Cloud + lokaal)
+# ---------------------------------------------------------
+ROOT = Path(__file__).resolve().parents[2]
+os.chdir(ROOT)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# ---------------------------------------------------------
+# DEV MARKERING
+# ---------------------------------------------------------
+st.set_page_config(
+    page_title="Peet DEV — niet voor testers",
+    page_icon="🧪",
+    layout="centered",
+>>>>>>> 2fb2802 (Add clean peet_dev app (no secrets))
 )
 
 st.warning("⚠️ Dit is de DEV-versie. Niet delen met testers.")
 
+<<<<<<< HEAD
 import os
 import json
 import re
@@ -444,3 +475,109 @@ st.download_button(
     file_name=filename,
     mime="application/pdf",
 )
+=======
+# ---------------------------------------------------------
+# IMPORTS (identiek aan stabiele app)
+# ---------------------------------------------------------
+# NB: Deze imports veronderstellen dezelfde modules
+# als in de stabiele app. Pas hier niets aan.
+from core.llm import call_peet
+from core.json_utils import extract_json
+from core.prompts import SYSTEM_PROMPT
+from core.images import generate_image_if_needed
+from core.pdf import render_pdf
+from core.shopping_list import build_shopping_list
+
+# ---------------------------------------------------------
+# INPUT GATEWAY (VOORBEREID — NOG NIET ACTIEF)
+# ---------------------------------------------------------
+def input_gateway(query_params: dict) -> dict:
+    """
+    Leest input uit query params en normaliseert.
+    LET OP: momenteel passief; we gebruiken defaults
+    zodat gedrag identiek blijft aan de stabiele app.
+    """
+    # Defaults (identiek aan stabiele app)
+    context = {
+        "mode": "vandaag",
+        "days": 1,
+        "persons": 2,
+        "time": "normaal",
+        "moment": "doordeweeks",
+        "preference": "peet",
+        "kitchen": None,
+        "fridge": [],
+        "allergies": [],
+        "nogo": [],
+        "language": "nl",
+    }
+
+    # Voor later: hier kunnen we query_params mappen
+    # zonder de engine of output te breken.
+
+    return context
+
+# ---------------------------------------------------------
+# UI — IDENTIEK AAN STABIELE APP
+# ---------------------------------------------------------
+def render_ui():
+    st.title("Peet kiest")
+    st.caption("Rust in je hoofd. Eten zonder gedoe.")
+
+    # (Laat dit blok identiek aan de stabiele app)
+    with st.form("peet_form", clear_on_submit=False):
+        persons = st.number_input("Voor hoeveel personen?", min_value=1, max_value=8, value=2)
+        submit = st.form_submit_button("Laat Peet kiezen")
+
+    return submit, persons
+
+# ---------------------------------------------------------
+# MAIN
+# ---------------------------------------------------------
+def main():
+    query_params = st.query_params
+
+    # Input gateway (passief)
+    context = input_gateway(query_params)
+
+    # UI
+    submit, persons = render_ui()
+    context["persons"] = persons
+
+    if submit:
+        with st.spinner("Peet denkt even na…"):
+            # Engine call (identiek)
+            raw = call_peet(
+                system_prompt=SYSTEM_PROMPT,
+                context=context,
+            )
+
+            data = extract_json(raw)
+
+        # Resultaat tonen (identiek)
+        st.subheader(data.get("title", ""))
+        st.write(data.get("description", ""))
+
+        # Afbeelding (on-demand)
+        generate_image_if_needed(data)
+
+        # Boodschappenlijst
+        shopping = build_shopping_list(data)
+        st.markdown("### Boodschappenlijst")
+        st.write(shopping)
+
+        # PDF
+        pdf_bytes = render_pdf(data, shopping)
+        st.download_button(
+            "Download PDF",
+            data=pdf_bytes,
+            file_name="peet_kiest.pdf",
+            mime="application/pdf",
+        )
+
+# ---------------------------------------------------------
+# RUN
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    main()
+>>>>>>> 2fb2802 (Add clean peet_dev app (no secrets))
