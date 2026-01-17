@@ -24,9 +24,7 @@ st.title("Peet Card — DEV input check")
 # =========================================================
 # QUERY PARAMS → NORMALISATIE
 # =========================================================
-
 qp = st.query_params
-
 
 def get_param_str(key: str, default: str = "") -> str:
     return qp.get(key, [default])[0].strip()
