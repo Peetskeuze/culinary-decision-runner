@@ -32,12 +32,9 @@ st.set_page_config(
     page_title="Peet DEV — niet voor testers",
     page_icon="🧪",
     layout="centered",
->>>>>>> 2fb2802 (Add clean peet_dev app (no secrets))
-)
 
-st.warning("⚠️ Dit is de DEV-versie. Niet delen met testers.")
+    st.warning("⚠️ Dit is de DEV-versie. Niet delen met testers.")
 
-<<<<<<< HEAD
 import os
 import json
 import re
