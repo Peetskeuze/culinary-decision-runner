@@ -3,7 +3,6 @@ import streamlit as st
 st.set_page_config(
     page_title="Peet DEV — niet voor testers",
     page_icon="🧪"
-=======
 # =========================================================
 # PEET DEV APP
 # Doel: veilige ontwikkelomgeving
