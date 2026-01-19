@@ -8,3 +8,13 @@ venv/
 *.log
 .DS_Store
 .streamlit/secrets.toml
+# Secrets / keys
+*-key.txt
+*.env
+.env
+*.env
+*key*.txt
+*secret*
+__pycache__/
+*.pyc
+apps/**/output/
