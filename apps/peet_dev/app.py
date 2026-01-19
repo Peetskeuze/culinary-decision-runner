@@ -1,47 +1,53 @@
 # =========================================================
-# BOOTSTRAP — Streamlit Cloud safe
+# PEET CARD — DEV
+# Doel: Carrd → Streamlit input check
+# LET OP: geen engine, geen output, alleen validatie
 # =========================================================
+
 import sys
 from pathlib import Path
+import streamlit as st
 
+# ---------------------------------------------------------
+# PROJECT ROOT BOOTSTRAP (Cloud + lokaal)
+# ---------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import streamlit as st
-
-# =========================================================
-# APP CONFIG — DEV
-# =========================================================
+# ---------------------------------------------------------
+# PAGE CONFIG (1x!)
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="Peet Card — DEV",
     page_icon="🧪",
+    layout="centered",
 )
 
 st.warning("⚠️ DEV-versie (peet-card). Niet delen met testers.")
 st.title("Peet Card — DEV input check")
 
-# =========================================================
-# QUERY PARAMS (nieuw API)
-# =========================================================
+# ---------------------------------------------------------
+# QUERY PARAMS (nieuwe API)
+# ---------------------------------------------------------
 qp = st.query_params
 
-def get_param_str(key, default=""):
+def get_param_str(key: str, default: str = "") -> str:
     return qp.get(key, default).strip() if key in qp else default
 
-def get_param_int(key, default):
+def get_param_int(key: str, default: int) -> int:
     try:
         return int(get_param_str(key, default))
     except Exception:
         return default
 
-def get_param_list(key):
+def get_param_list(key: str) -> list[str]:
     raw = get_param_str(key, "")
-    return [i.strip() for i in raw.split(",") if i.strip()]
+    return [x.strip() for x in raw.split(",") if x.strip()]
 
-# =========================================================
+# ---------------------------------------------------------
 # PARSE INPUT (Carrd → Streamlit)
-# =========================================================
+# ---------------------------------------------------------
 days = get_param_int("days", 1)
 persons = get_param_int("persons", 2)
 
@@ -54,21 +60,9 @@ fridge = get_param_list("fridge")
 nogo = get_param_list("nogo")
 allergies = get_param_list("allergies")
 
-context = {
-    "days": days,
-    "persons": persons,
-    "time": time,
-    "moment": moment,
-    "preference": preference,
-    "kitchen": kitchen,
-    "fridge": fridge,
-    "nogo": nogo,
-    "allergies": allergies,
-}
-
-# =========================================================
-# OUTPUT — CHECK
-# =========================================================
+# ---------------------------------------------------------
+# TONEN OP SCHERM (DEV CHECK)
+# ---------------------------------------------------------
 st.subheader("Ontvangen input vanuit Carrd")
 
 st.write("Aantal dagen:", days)
