@@ -52,7 +52,6 @@ from_carrd = bool(q("days") or q("persons") or q("moment"))
 # ---------------------------------------------------------
 # Titel
 # ---------------------------------------------------------
-st.title("Peet kiest voor je")
 st.caption("Rustig. Zonder keuzestress. Ik kijk even met je mee.")
 
 # ---------------------------------------------------------
