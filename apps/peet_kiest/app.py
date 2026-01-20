@@ -1,4 +1,9 @@
 import streamlit as st
+
+st.warning(
+    "Peet is in ontwikkeling. Houd je WhatsApp in de gaten, een nieuwe versie is onderweg."
+)
+
 import sys
 from pathlib import Path
 
