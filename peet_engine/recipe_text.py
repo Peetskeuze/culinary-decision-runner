@@ -1,73 +1,62 @@
 from typing import Dict
 
 
-RECIPES: Dict[str, Dict[str, object]] = {
+RECIPES: Dict[str, Dict[str, str]] = {
     "Citroen couscous met kruiden en groenten": {
         "opening": (
             "Dit is zo’n gerecht dat licht aanvoelt, maar toch vult. "
             "Fris door de citroen, warm door de kruiden en met genoeg groenten "
             "om er zonder nadenken van te eten.\n\n"
-            "Perfect voor dagen waarop je wel iets goeds wilt, "
-            "maar het simpel wilt houden."
+            "Ideaal voor doordeweeks, wanneer je iets goeds wilt maken "
+            "zonder dat het ingewikkeld wordt."
         ),
         "preparation": (
-            "Begin met het klaarmaken van de couscous, zodat die rustig kan wellen. "
-            "Snijd ondertussen de groenten en bak ze in een ruime pan met olijfolie "
-            "en de kruiden die je lekker vindt. Laat ze zacht worden, zonder te haasten.\n\n"
-            "Meng de couscous los met een vork, rasp er citroenschil over en schep "
-            "alles samen. Proef, breng op smaak en stop zodra het klopt. "
-            "Dit gerecht hoeft niet perfect te zijn om goed te zijn."
+            "Zo pak je dit aan.\n\n"
+            "Begin met de couscous. Giet er heet water over en laat hem "
+            "rustig wellen terwijl jij de rest voorbereidt. "
+            "Snijd de groenten in grove stukken en bak ze in een ruime pan "
+            "met olijfolie en kruiden. Geef ze de tijd om zacht te worden "
+            "en kleur te krijgen.\n\n"
+            "Maak de couscous los met een vork, rasp er wat citroenschil over "
+            "en schep alles samen. Proef, stel bij en stop zodra het klopt. "
+            "Dit gerecht hoeft niet af om goed te zijn."
         ),
-        "ingredients": {
-            "Couscous": "ongeveer 80–100 g per persoon",
-            "Citroen": "1 stuk",
-            "Paprika": "2 stuks",
-            "Courgette": "1 stuk",
-            "Rode ui": "1 stuk",
-            "Olijfolie": "naar behoefte",
-            "Kruiden (komijn, koriander, paprikapoeder)": "naar smaak",
-            "Zout en peper": "naar smaak",
-        },
     },
 
     "Geroosterde bloemkool met kruidige yoghurt en citroen": {
         "opening": (
-            "Bloemkool kan veel meer zijn dan een bijgerecht. In de oven geroosterd "
-            "krijgt hij iets nootachtigs en stevigs, bijna vanzelf. "
-            "Gecombineerd met kruidige yoghurt en citroen voelt dit als een "
-            "volwaardige maaltijd.\n\n"
-            "Vegetarisch, zonder dat je het idee hebt dat je iets inlevert."
+            "Bloemkool is zo’n groente die het goed doet als je hem met rust laat. "
+            "In de oven geroosterd wordt hij nootachtig en vol van smaak, "
+            "zonder dat je er veel aan hoeft te doen.\n\n"
+            "Met frisse yoghurt en citroen voelt dit als een complete maaltijd, "
+            "niet als een compromis."
         ),
         "preparation": (
-            "Zet de oven aan en snijd de bloemkool in flinke roosjes. Meng ze met "
-            "olijfolie, kruiden, zout en peper en spreid alles uit op een bakplaat. "
-            "De oven doet nu het werk; laat de bloemkool rustig roosteren tot hij "
-            "goudbruin is.\n\n"
-            "Terwijl dat gebeurt, maak je de yoghurt fris en romig met knoflook, "
-            "citroen en een scheut olijfolie. Haal de bloemkool uit de oven en "
-            "serveer met de yoghurt en iets erbij wat je fijn vindt."
+            "Zo pakken we dit aan.\n\n"
+            "Verwarm de oven voor en snijd de bloemkool in flinke roosjes. "
+            "Meng ze met olijfolie, kruiden, zout en peper en spreid ze uit "
+            "op een bakplaat. De oven doet nu het werk. Laat de bloemkool "
+            "rustig roosteren tot hij goudbruin is en zacht van binnen.\n\n"
+            "Meng ondertussen de yoghurt met knoflook, citroen en een scheut "
+            "olijfolie. Haal de bloemkool uit de oven, geef alles even rust "
+            "en serveer het samen. Meer hoeft het niet te zijn."
         ),
-        "ingredients": {
-            "Bloemkool": "1 grote",
-            "Griekse yoghurt": "1 bak",
-            "Citroen": "1 stuk",
-            "Knoflook": "1–2 tenen",
-            "Olijfolie": "naar behoefte",
-            "Paprikapoeder": "1 tl",
-            "Komijn": "1 tl",
-            "Zout en peper": "naar smaak",
-            "Platbrood of couscous": "ongeveer 80–100 g per persoon",
-        },
     },
 }
 
 
-def get_recipe(dish_name: str) -> Dict[str, object]:
+def get_recipe(dish_name: str) -> Dict[str, str]:
     return RECIPES.get(
         dish_name,
         {
-            "opening": "Een gerecht dat rustig op tafel komt en precies doet wat het moet doen.",
-            "preparation": "Bereid dit gerecht op een manier die voor jou logisch voelt.",
-            "ingredients": {},
+            "opening": (
+                "Dit is een gerecht dat je zonder nadenken op tafel zet. "
+                "Rustig, logisch en precies goed voor het moment."
+            ),
+            "preparation": (
+                "Zo pak je dit aan.\n\n"
+                "Bereid het gerecht stap voor stap op een manier die voor jou "
+                "logisch voelt. Neem de tijd waar het kan en stop zodra het klopt."
+            ),
         },
     )

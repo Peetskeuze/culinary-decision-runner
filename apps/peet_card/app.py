@@ -1,15 +1,26 @@
 # =========================================================
-# PEET CARD — PRODUCTIE (lokaal)
+# PEET CARD — LOKAAL (STABIEL)
 # Carrd → Streamlit → Peet Engine → Render + PDF
 # =========================================================
 
 import sys
-import json
 from pathlib import Path
+from datetime import datetime
+import locale
 import streamlit as st
 
+
+
 # ---------------------------------------------------------
-# PROJECT ROOT BOOTSTRAP
+# LOCALE
+# ---------------------------------------------------------
+try:
+    locale.setlocale(locale.LC_TIME, "nl_NL.UTF-8")
+except Exception:
+    pass
+
+# ---------------------------------------------------------
+# PROJECT ROOT
 # ---------------------------------------------------------
 CURRENT_FILE = Path(__file__).resolve()
 PROJECT_ROOT = CURRENT_FILE.parents[2]
@@ -18,10 +29,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # ---------------------------------------------------------
-# ENGINE & RENDER IMPORTS
+# ENGINE IMPORTS
 # ---------------------------------------------------------
 from peet_engine.run import call_peet
-from peet_engine.render_simple import render_plan
+from peet_engine.context import build_context, build_context_text
 from peet_engine.render_pdf import build_plan_pdf
 
 # ---------------------------------------------------------
@@ -32,9 +43,6 @@ st.set_page_config(
     page_icon="🍳",
     layout="centered",
 )
-
-st.title("Peet kiest. Jij hoeft alleen te koken.")
-st.caption("Geen keuzestress. Geen gedoe.")
 
 # ---------------------------------------------------------
 # QUERY PARAMS
@@ -59,7 +67,7 @@ def get_param_list(key: str) -> list[str]:
 
 
 # ---------------------------------------------------------
-# INPUT
+# INPUT (UIT CARRD / URL)
 # ---------------------------------------------------------
 days = get_param_int("days", 1)
 persons = get_param_int("persons", 2)
@@ -79,42 +87,98 @@ if days not in (1, 2, 3, 5):
     days = 2
 
 persons = min(max(persons, 1), 8)
-mode = "vooruit" if days > 1 else "vandaag"
 
 # ---------------------------------------------------------
-# CONTEXT
+# CONTEXT — KEUZELOGICA (LEIDEND)
 # ---------------------------------------------------------
-context = {
-    "mode": mode,
-    "days": days,
-    "persons": persons,
-    "time": time,
-    "moment": moment,
-    "kitchen": kitchen or None,
-    "fridge": fridge,
-    "nogo": nogo,
-    "allergies": allergies,
-    "language": "nl",
-}
 
-context_json = json.dumps(context, ensure_ascii=False)
+if days == 1:
+    # Vandaag = alles mag
+    ctx = build_context({
+        "mode": "vandaag",
+        "days": 1,
+        "persons": persons,
+        "time": time,
+        "moment": moment,
+        "kitchen": kitchen,
+        "fridge": fridge,
+        "nogo": nogo,
+        "allergies": allergies,
+        "vegetarian": False,
+        "language": "nl",
+    })
+
+else:
+    # Vooruit = minimale input, Peet bepaalt
+    ctx = build_context({
+        "mode": "vooruit",
+        "days": days,
+        "persons": persons,
+        "allergies": allergies,
+        "nogo": nogo,
+        "language": "nl",
+    })
+
+
+context_text = build_context_text(ctx)
 
 # ---------------------------------------------------------
-# RUN → RENDER
+# TITEL
 # ---------------------------------------------------------
+if ctx["days"] == 1:
+    st.title("Peet kiest. Jij hoeft alleen te koken.")
+    st.caption("Vandaag geregeld.")
+else:
+    st.title(f"Peet plant vooruit · {ctx['days']} dagen")
+    st.caption("Peet bewaakt balans en variatie.")
+
+# ---------------------------------------------------------
+# RUN ENGINE
+# ---------------------------------------------------------
+import json
+
 with st.spinner("Peet is aan het kiezen…"):
-    result = call_peet(context_json)
+    result = call_peet(
+        json.dumps(ctx, ensure_ascii=False)
+    )
 
-render_plan(result)
+
+# ---------------------------------------------------------
+# RENDER RESULTAAT
+# ---------------------------------------------------------
+days_out = result.get("days", [])
+
+for i, day in enumerate(days_out, start=1):
+    if ctx["days"] > 1:
+        st.markdown(f"## Dag {i}")
+
+    st.markdown(f"### {day.get('dish_name', '')}")
+
+    if day.get("why"):
+        st.markdown(day["why"])
+
+    if day.get("description"):
+        st.markdown(day["description"])
+
+    st.markdown("---")
 
 # ---------------------------------------------------------
 # PDF DOWNLOAD
 # ---------------------------------------------------------
 pdf_buffer = build_plan_pdf(result)
 
+now = datetime.now()
+weekday = now.strftime("%A").capitalize()
+date_str = now.strftime("%d-%m-%Y")
+
+if ctx["days"] == 1:
+    pdf_name = f"Peet_koos_vandaag_{weekday}_{date_str}.pdf"
+else:
+    pdf_name = f"Peet_koos_{ctx['days']}_dagen_vooruit_vanaf_{date_str}.pdf"
+
 st.download_button(
     label="Download als PDF",
     data=pdf_buffer,
-    file_name="Peet_kiest_menu.pdf",
+    file_name=pdf_name,
     mime="application/pdf",
 )

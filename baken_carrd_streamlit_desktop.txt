@@ -1,0 +1,25 @@
+Plak dit in bijvoorbeeld C:\culinary_decision_suite\baken_carrd_streamlit_desktop.txt:
+
+Bakennaam: Carrd → Streamlit input gevalideerd · Desktop-focus
+
+Carrd rol: alleen GET params meegeven, geen validatie
+
+Streamlit rol: query params lezen → normaliseren → validatie → spinner → engine call → output + PDF
+
+Keys: mode, days, persons, vegetarian, allergies, moment, time, ambition, language, keuken, fridge, nogo
+
+Regels:
+
+mode verplicht (vandaag/vooruit), days alleen relevant bij vooruit
+
+days normaliseren naar 2/3/5 (vooruit) en 1 (vandaag)
+
+persons normaliseren 1..8 (default 2)
+
+allergies/nogo/fridge split op komma, strip, lower, lege items weg
+
+nooit crashen op ontbrekende params
+
+UX: geen extra schermen, alleen spinner + resultaat
+
+Focus nu: Desktop ChatGPT, korte sessies per blok, baken altijd plakken

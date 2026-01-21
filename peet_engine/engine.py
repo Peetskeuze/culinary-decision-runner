@@ -35,6 +35,22 @@ def determine_day_profiles(days: int) -> List[str]:
 
     return ["licht"] * days
 
+def determine_kitchen_sequence(days: int) -> list[str]:
+    if days == 1:
+        return ["vrij"]
+
+    if days == 2:
+        return ["nl_be", "italiaans"]
+
+    if days == 3:
+        return ["nl_be", "italiaans", "aziatisch"]
+
+    if days == 5:
+        return ["nl_be", "italiaans", "mediterraan", "frans", "nl_be"]
+
+    raise ValueError("Ongeldig aantal dagen")
+
+
 
 # Ambitie-cap per moment
 MOMENT_AMBITION_CAP = {
@@ -80,20 +96,22 @@ DISHES: List[Dish] = [
     Dish("Stoofpotje met rund en wortel", "Beef and carrot stew", "afronding", False, tags=("stoof",)),
 ]
 
-
 # -----------------------------
 # Public API
 # -----------------------------
 def plan(context: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Deterministic engine: context -> choice plan (names only).
+    Deterministic engine: context -> choice plan.
     No LLM. No UI.
     """
     ctx = _normalize_context(context)
     days = ctx["days"]
 
-    # Stap 3: semantisch ritme
+    # -----------------------------
+    # Vast ritme (afdwingen)
+    # -----------------------------
     profiles = determine_day_profiles(days)
+    kitchens = determine_kitchen_sequence(days)
 
     # ambition normalization
     ambition = _apply_ambition_caps(ctx)
@@ -102,11 +120,17 @@ def plan(context: Dict[str, Any]) -> Dict[str, Any]:
     out_days: List[Dict[str, Any]] = []
     used_names: set[str] = set()
 
-    for idx, profile in enumerate(profiles, start=1):
+    # -----------------------------
+    # Dag-voor-dag keuze
+    # -----------------------------
+    for idx, (profile, kitchen) in enumerate(
+        zip(profiles, kitchens), start=1
+    ):
         day_amb = ambition_by_day[idx - 1]
 
         dish = _pick_dish(
             profile=profile,
+            kitchen=kitchen,
             vegetarian=ctx["vegetarian"],
             allergies=ctx["allergies"],
             language=ctx["language"],
@@ -118,11 +142,12 @@ def plan(context: Dict[str, Any]) -> Dict[str, Any]:
 
         if dish is None:
             dish = _fallback_pick(
+                profile=profile,
+                kitchen=kitchen,
                 vegetarian=ctx["vegetarian"],
                 allergies=ctx["allergies"],
                 language=ctx["language"],
                 used_names=used_names,
-                target_profile=profile,
             )
 
         name = dish.name_en if ctx["language"] == "en" else dish.name_nl
@@ -132,11 +157,13 @@ def plan(context: Dict[str, Any]) -> Dict[str, Any]:
             {
                 "day": idx,
                 "profile": profile,
+                "kitchen": kitchen,
                 "dish_name": name,
                 "ambition": day_amb,
                 "why": _why_line(
                     language=ctx["language"],
                     profile=profile,
+                    kitchen=kitchen,
                     moment=ctx["moment"],
                     time=ctx["time"],
                     ambition=day_amb,
@@ -144,13 +171,21 @@ def plan(context: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
 
-    return {"days": out_days}
+    return {
+        "days_count": days,
+        "persons": ctx["persons"],
+        "days": out_days,
+    }
+
 
 
 # -----------------------------
 # Internals
 # -----------------------------
 def _normalize_context(raw: Dict[str, Any]) -> Dict[str, Any]:
+    # -----------------------------
+    # Mode & days
+    # -----------------------------
     mode = str(raw.get("mode", "vandaag")).lower()
     if mode not in ALLOWED_MODE:
         mode = "vandaag"
@@ -161,9 +196,35 @@ def _normalize_context(raw: Dict[str, Any]) -> Dict[str, Any]:
     if days not in ALLOWED_DAYS:
         days = 1
 
-    vegetarian = bool(raw.get("vegetarian", False))
-    allergies = [str(a).strip().lower() for a in raw.get("allergies", []) if str(a).strip()]
+    # -----------------------------
+    # Persons (ALTJD aanwezig)
+    # -----------------------------
+    try:
+        persons = int(raw.get("persons", 2))
+    except Exception:
+        persons = 2
+    persons = max(1, min(8, persons))
 
+    # -----------------------------
+    # Dietary & restrictions
+    # -----------------------------
+    vegetarian = bool(raw.get("vegetarian", False))
+
+    allergies = [
+        str(a).strip().lower()
+        for a in raw.get("allergies", [])
+        if str(a).strip()
+    ]
+
+    nogo = [
+        str(n).strip().lower()
+        for n in raw.get("nogo", [])
+        if str(n).strip()
+    ]
+
+    # -----------------------------
+    # Contextual signals
+    # -----------------------------
     moment = str(raw.get("moment", "doordeweeks")).lower()
     if moment not in ALLOWED_MOMENT:
         moment = "doordeweeks"
@@ -175,6 +236,9 @@ def _normalize_context(raw: Dict[str, Any]) -> Dict[str, Any]:
     ambition = int(raw.get("ambition", 2))
     ambition = max(1, min(4, ambition))
 
+    # -----------------------------
+    # Language
+    # -----------------------------
     language = str(raw.get("language", "nl")).lower()
     if language not in ALLOWED_LANG:
         language = "nl"
@@ -182,8 +246,10 @@ def _normalize_context(raw: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "mode": mode,
         "days": days,
+        "persons": persons,
         "vegetarian": vegetarian,
         "allergies": allergies,
+        "nogo": nogo,
         "moment": moment,
         "time": time,
         "ambition": ambition,
@@ -216,63 +282,111 @@ def _spread_ambition(days: int, base: int) -> List[int]:
     return arr
 
 
+from typing import Optional
+
+
 def _pick_dish(
     profile: str,
+    kitchen: str,
     vegetarian: bool,
-    allergies: List[str],
+    allergies: list,
     language: str,
-    used_names: set[str],
+    used_names: set,
     moment: str,
     time: str,
     ambition: int,
 ) -> Optional[Dish]:
-    candidates = []
+    candidates: list[Dish] = []
+
     for d in DISHES:
+        # profiel afdwingen
         if d.profile != profile:
             continue
+
+        # keuken afdwingen (behalve bij 'vrij')
+        if kitchen != "vrij" and d.kitchen != kitchen:
+            continue
+
+        # vegetarisch
         if vegetarian and not d.veg:
             continue
+
+        # allergieën
         if _hits_allergy(d, allergies):
             continue
+
+        # geen herhaling
         name = d.name_en if language == "en" else d.name_nl
         if name in used_names:
             continue
+
         candidates.append(d)
 
     if not candidates:
         return None
 
-    candidates.sort(key=lambda d: d.name_nl if language == "nl" else d.name_en)
+    # deterministisch: alfabetisch
+    candidates.sort(
+        key=lambda d: d.name_en if language == "en" else d.name_nl
+    )
+
     return candidates[0]
 
 
+
+from typing import List
+
+
 def _fallback_pick(
+    profile: str,
+    kitchen: str,
     vegetarian: bool,
     allergies: List[str],
     language: str,
     used_names: set[str],
-    target_profile: str,
 ) -> Dish:
-    pool = [
-        d for d in DISHES
-        if (not vegetarian or d.veg) and not _hits_allergy(d, allergies)
-    ]
+    pool = []
+
+    for d in DISHES:
+        # vegetarisch
+        if vegetarian and not d.veg:
+            continue
+
+        # allergieën
+        if _hits_allergy(d, allergies):
+            continue
+
+        # keuken afdwingen (behalve bij 'vrij')
+        if kitchen != "vrij" and d.kitchen != kitchen:
+            continue
+
+        # geen herhaling
+        name = d.name_en if language == "en" else d.name_nl
+        if name in used_names:
+            continue
+
+        pool.append(d)
 
     if not pool:
+        # ultieme noodfallback (veilig, maar zeldzaam)
         return Dish(
             name_nl="Eenvoudige, veilige groenteschotel",
             name_en="Simple, safe vegetable dish",
-            profile=target_profile,
+            profile=profile,
+            kitchen=kitchen,
             veg=True,
         )
 
+    # zo dicht mogelijk bij gewenst profiel
     pool.sort(
         key=lambda d: (
-            abs(PROFILE_RANK[d.profile] - PROFILE_RANK[target_profile]),
-            d.name_nl if language == "nl" else d.name_en,
+            abs(PROFILE_RANK[d.profile] - PROFILE_RANK[profile]),
+            d.name_en if language == "en" else d.name_nl,
         )
     )
+
     return pool[0]
+
 
 
 def _hits_allergy(dish: Dish, allergies: List[str]) -> bool:
@@ -287,8 +401,51 @@ def _hits_allergy(dish: Dish, allergies: List[str]) -> bool:
     return any(a in text for a in allergies)
 
 
-def _why_line(language: str, profile: str, moment: str, time: str, ambition: int) -> str:
+def _why_line(
+    language: str,
+    profile: str,
+    kitchen: str,
+    moment: str,
+    time: str,
+    ambition: int,
+) -> str:
+    """
+    Korte duiding waarom dit gerecht hier past.
+    Rustig, niet uitleggerig.
+    """
+
     if language == "en":
-        return f"{profile.capitalize()} profile for a {moment.replace('_', ' ')} moment. Time: {time}. Ambition: {ambition}."
-    moment_txt = "iets te vieren" if moment == "iets_te_vieren" else moment
-    return f"{profile.capitalize()} profiel, passend bij {moment_txt}. Tijd: {time}. Ambitie: {ambition}."
+        base = "Fits well"
+    else:
+        base = "Past goed"
+
+    parts = []
+
+    # keuken (alleen als expliciet)
+    if kitchen and kitchen != "vrij":
+        if language == "en":
+            parts.append(f"within a {kitchen.replace('_', ' ')} style")
+        else:
+            parts.append(f"binnen een {kitchen.replace('_', ' ')} keuken")
+
+    # profiel
+    if profile == "licht":
+        parts.append("licht van karakter")
+    elif profile == "vol":
+        parts.append("wat steviger")
+    elif profile == "afronding":
+        parts.append("fijn om mee af te sluiten")
+
+    # moment / tijd
+    if moment == "weekend":
+        parts.append("past bij het weekend")
+    else:
+        parts.append("geschikt voor doordeweeks")
+
+    if time == "kort":
+        parts.append("en snel klaar")
+    elif time == "ruim":
+        parts.append("met ruimte om rustig te koken")
+
+    return f"{base} omdat het " + ", ".join(parts) + "."
+

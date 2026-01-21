@@ -1,116 +1,163 @@
 from io import BytesIO
-from typing import Dict, Any, List
+from datetime import datetime
+import locale
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    PageBreak,
+)
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet
 
-from peet_engine.recipe_text import get_recipe
-from peet_engine.render_pdf_helpers import categorize, CATEGORY_ORDER
+# Deze helpers moeten al bestaan in je project
+# - categorize(name)
+# - amount_for_item(name, persons)
+# - CATEGORY_ORDER
+# ---------------------------------------------------------
+# BOODSCHAPPEN CATEGORIEËN (VASTE VOLGORDE)
+# ---------------------------------------------------------
+CATEGORY_ORDER = [
+    "Groente & fruit",
+    "Brood & ontbijt",
+    "Zuivel & eieren",
+    "Vlees, vis & vega",
+    "Houdbaar",
+    "Kruiden & oliën",
+    "Koeling / diepvries",
+    "Overig",
+]
 
 
-def build_plan_pdf(result: Dict[str, Any]) -> BytesIO:
+def build_plan_pdf(result: dict) -> BytesIO:
     buffer = BytesIO()
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=2.2 * cm,
-        leftMargin=2.2 * cm,
-        topMargin=2.5 * cm,
-        bottomMargin=2.5 * cm,
+    # =========================
+    # DOCUMENT SETUP
+    # =========================
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Locale NL (fallback ok)
+    try:
+        locale.setlocale(locale.LC_TIME, "nl_NL.UTF-8")
+    except Exception:
+        pass
+
+    # =========================
+    # VOORPAGINA
+    # =========================
+    now = datetime.now()
+    weekday = now.strftime("%A").capitalize()
+    date_str = now.strftime("%d-%m-%Y")
+
+    days_list = result.get("days", [])
+    days_count = result.get("days_count") or len(days_list)
+
+    if days_count == 1:
+        cover_title = "Peet koos vandaag"
+        cover_subtitle = f"{weekday} {date_str}"
+    else:
+        cover_title = f"Peet koos {days_count} dagen vooruit"
+        cover_subtitle = f"Vanaf {date_str}"
+
+    story.append(Spacer(1, 120))
+    story.append(
+        Paragraph(
+            f"<b><font size='22'>{cover_title}</font></b>",
+            styles["Title"],
+        )
     )
+    story.append(Spacer(1, 24))
+    story.append(
+        Paragraph(
+            f"<font size='14'>{cover_subtitle}</font>",
+            styles["Normal"],
+        )
+    )
+    story.append(Spacer(1, 200))
+    story.append(
+        Paragraph(
+            "<font size='10'>Peet kiest. Jij hoeft alleen te koken.</font>",
+            styles["Normal"],
+        )
+    )
+    story.append(PageBreak())
 
-    base_styles = getSampleStyleSheet()
+    # =========================
+    # GERECHTEN PER DAG
+    # =========================
+    for idx, day in enumerate(days_list, start=1):
+        if days_count > 1:
+            story.append(
+                Paragraph(f"Dag {idx}", styles["Heading1"])
+            )
+            story.append(Spacer(1, 8))
 
-    styles = {
-        "title": ParagraphStyle(
-            "title",
-            parent=base_styles["Title"],
-            fontSize=20,
-            spaceAfter=18,
-        ),
-        "dish": ParagraphStyle(
-            "dish",
-            parent=base_styles["Heading2"],
-            fontSize=15,
-            spaceBefore=18,
-            spaceAfter=8,
-        ),
-        "section": ParagraphStyle(
-            "section",
-            parent=base_styles["Heading3"],
-            fontSize=12,
-            spaceBefore=12,
-            spaceAfter=6,
-        ),
-        "body": ParagraphStyle(
-            "body",
-            parent=base_styles["BodyText"],
-            fontSize=10.5,
-            leading=14,
-            spaceAfter=6,
-        ),
-        "list": ParagraphStyle(
-            "list",
-            parent=base_styles["BodyText"],
-            fontSize=10.5,
-            leading=14,
-            leftIndent=10,
-            spaceAfter=4,
-        ),
-    }
-
-    story: List = []
-
-    # Titel
-    story.append(Paragraph("Peet kiest. Jij hoeft alleen te koken.", styles["title"]))
-
-    combined_items: Dict[str, str] = {}
-
-    # Per gerecht
-    for day in result.get("days", []):
-        dish = day.get("dish_name", "")
-        recipe = get_recipe(dish)
-
-        story.append(Paragraph(dish, styles["dish"]))
-        story.append(Paragraph(recipe["opening"], styles["body"]))
-        story.append(Spacer(1, 8))
-
-        story.append(Paragraph("Zo pak je dit aan", styles["section"]))
-        for paragraph in recipe["preparation"].split("\n\n"):
-            story.append(Paragraph(paragraph, styles["body"]))
-
-        story.append(Spacer(1, 8))
-        story.append(Paragraph("Ingrediënten", styles["section"]))
-
-        for item, qty in recipe.get("ingredients", {}).items():
-            story.append(Paragraph(f"{item} — {qty}", styles["list"]))
-            combined_items.setdefault(item, qty)
-
-        story.append(Spacer(1, 14))
-
-    # Gecombineerde boodschappenlijst
-    if combined_items:
-        story.append(Spacer(1, 12))
-        story.append(Paragraph("Gecombineerde boodschappenlijst", styles["dish"]))
-
-        categorized: Dict[str, List[str]] = {k: [] for k in CATEGORY_ORDER}
-        for item, qty in combined_items.items():
-            cat = categorize(item)
-            categorized[cat].append(f"{item} — {qty}")
-
-        for category in CATEGORY_ORDER:
-            items = categorized.get(category, [])
-            if not items:
-                continue
-
-            story.append(Paragraph(category, styles["section"]))
-            for line in sorted(items):
-                story.append(Paragraph(line, styles["list"]))
+        dish_name = day.get("dish_name")
+        if dish_name:
+            story.append(
+                Paragraph(f"<b>{dish_name}</b>", styles["Heading2"])
+            )
             story.append(Spacer(1, 6))
 
+        why = day.get("why")
+        if why:
+            story.append(Paragraph(why, styles["Normal"]))
+            story.append(Spacer(1, 6))
+
+        description = day.get("description")
+        if description:
+            story.append(Paragraph(description, styles["Normal"]))
+            story.append(Spacer(1, 12))
+
+        story.append(Spacer(1, 12))
+
+    story.append(PageBreak())
+
+    # =========================
+    # BOODSCHAPPENLIJST
+    # =========================
+    persons = result.get("persons", 1)
+
+    story.append(Paragraph("Boodschappenlijst", styles["Title"]))
+    story.append(Spacer(1, 12))
+
+    categorized = {}
+
+    for day in days_list:
+        for item in day.get("ingredients", []):
+            name = item.get("name")
+            if not name:
+                continue
+
+            category = categorize(name)
+
+            if category not in categorized:
+                categorized[category] = {}
+
+            if name not in categorized[category]:
+                categorized[category][name] = amount_for_item(name, persons)
+
+    for category in CATEGORY_ORDER:
+        items = categorized.get(category)
+        if not items:
+            continue
+
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(category, styles["Heading2"]))
+
+        for name, amount in items.items():
+            line = f"- {name}"
+            if amount:
+                line += f": {amount}"
+            story.append(Paragraph(line, styles["Normal"]))
+
+    # =========================
+    # PDF AFRONDEN
+    # =========================
     doc.build(story)
     buffer.seek(0)
     return buffer

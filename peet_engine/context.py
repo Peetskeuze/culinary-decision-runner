@@ -1,94 +1,116 @@
 # =========================================================
-# CONTEXT — WAARHEID + BETEKENIS (STAP 1 + STAP 2)
+# CONTEXT — WAARHEID + BESLISLOGICA (PEET-CARD)
 # =========================================================
 
 from typing import Dict, Any, List
 from peet_engine.shared.parsing import safe_int, split_list, normalize_str
 
 
-# --------------------------------------------------
-# DEFAULTS — één plek, leidend (STAP 1)
-# --------------------------------------------------
+# ---------------------------------------------------------
+# CONSTANTEN — LEIDEND
+# ---------------------------------------------------------
+ALLOWED_DAYS = (1, 2, 3, 5)
+
 DEFAULTS = {
-    "mode": "vandaag",          # vandaag | vooruit
-    "days": 1,                  # 1 | 2 | 3 | 5
-    "persons": 2,               # int >= 1
-    "vegetarian": False,        # bool
-    "allergies": [],            # list[str]
-    "moment": "diner",          # ontbijt | lunch | diner
-    "time": "normaal",          # snel | normaal | uitgebreid
-    "ambition": 2,              # 1..4
-    "language": "nl",            # nl | en
-    "keuken": None,              # optioneel, stijl (geen ingrediënten)
+    "days": 1,
+    "persons": 2,
+    "vegetarian": False,
+    "allergies": [],
+    "nogo": [],
+    "moment": "doordeweeks",
+    "time": "normaal",
+    "ambition": 2,
+    "language": "nl",
+    "kitchen": None,     # alleen bij 1 dag
+    "kitchens": [],     # alleen bij vooruit
 }
 
-ALLOWED_DAYS = (1, 2, 3, 5)
-ALLOWED_MODES = ("vandaag", "vooruit")
+# Vooruit-profielen: Peet beslist
+FORWARD_KITCHENS = {
+    2: ["nl_be", "italiaans"],
+    3: ["nl_be", "italiaans", "aziatisch"],
+    5: ["nl_be", "italiaans", "mediterraans", "frans", "nl_be"],
+}
 
 
-# --------------------------------------------------
-# PUBLIC API — STAP 1
-# --------------------------------------------------
+# ---------------------------------------------------------
+# PUBLIC API — CONTEXT BOUWEN
+# ---------------------------------------------------------
 def build_context(raw: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Bouwt een stabiele, genormaliseerde context.
-    Geen betekenis, geen interpretatie.
+    Bouwt de enige geldige context voor Peet-Card.
+    Afdwinging van 1 dag vs vooruit zit hier.
     """
 
     ctx = dict(DEFAULTS)
 
-    # --- mode ---
-    mode = normalize_str(raw.get("mode", ctx["mode"]))
-    if mode not in ALLOWED_MODES:
-        mode = ctx["mode"]
-    ctx["mode"] = mode
-
-    # --- days ---
-    days_raw = raw.get("days", ctx["days"])
-    days = safe_int(days_raw, ctx["days"])
-    if ctx["mode"] == "vandaag":
-        days = 1
+    # -----------------------------
+    # DAYS
+    # -----------------------------
+    days = safe_int(raw.get("days", ctx["days"]), ctx["days"])
     if days not in ALLOWED_DAYS:
-        days = ctx["days"]
+        days = 1
     ctx["days"] = days
 
-    # --- persons ---
+    # -----------------------------
+    # PERSONS
+    # -----------------------------
     persons = safe_int(raw.get("persons", ctx["persons"]), ctx["persons"])
-    ctx["persons"] = max(1, persons)
+    ctx["persons"] = min(8, max(1, persons))
 
-    # --- vegetarian ---
-    ctx["vegetarian"] = _to_bool(raw.get("vegetarian", ctx["vegetarian"]))
-
-    # --- allergies ---
+    # -----------------------------
+    # ALLERGIES & NO-GO
+    # -----------------------------
     ctx["allergies"] = split_list(raw.get("allergies", []))
+    ctx["nogo"] = split_list(raw.get("nogo", []))
 
-    # --- moment ---
-    ctx["moment"] = normalize_str(raw.get("moment", ctx["moment"]))
+    # =====================================================
+    # DAG-LOGICA — HIER WORDT HET VERSCHIL AFGEDWONGEN
+    # =====================================================
 
-    # --- time ---
-    ctx["time"] = normalize_str(raw.get("time", ctx["time"]))
+    # -----------------------------------------------------
+    # 1 DAG → GEBRUIKER STUURT
+    # -----------------------------------------------------
+    if ctx["days"] == 1:
+        ctx["vegetarian"] = _to_bool(raw.get("vegetarian", False))
+        ctx["moment"] = normalize_str(raw.get("moment", ctx["moment"]))
+        ctx["time"] = normalize_str(raw.get("time", ctx["time"]))
 
-    # --- ambition ---
-    ambition = safe_int(raw.get("ambition", ctx["ambition"]), ctx["ambition"])
-    ctx["ambition"] = min(4, max(1, ambition))
+        ambition = safe_int(raw.get("ambition", ctx["ambition"]), ctx["ambition"])
+        ctx["ambition"] = min(4, max(1, ambition))
 
-    # --- language ---
+        kitchen = raw.get("kitchen")
+        ctx["kitchen"] = normalize_str(kitchen) if kitchen else None
+
+        ctx["kitchens"] = []
+
+    # -----------------------------------------------------
+    # VOORUIT (2 / 3 / 5) → PEET BESLIST
+    # -----------------------------------------------------
+    else:
+        ctx["vegetarian"] = False
+        ctx["moment"] = None
+        ctx["time"] = None
+        ctx["ambition"] = 2
+        ctx["kitchen"] = None
+
+        ctx["kitchens"] = FORWARD_KITCHENS.get(ctx["days"], [])
+
+    # -----------------------------
+    # LANGUAGE
+    # -----------------------------
     lang = normalize_str(raw.get("language", ctx["language"]))
     ctx["language"] = "en" if lang == "en" else "nl"
-
-    # --- keuken ---
-    kitchen = raw.get("keuken")
-    ctx["keuken"] = normalize_str(kitchen) if kitchen else None
 
     return ctx
 
 
-# --------------------------------------------------
-# PUBLIC API — STAP 2 (BETEKENISLAAG)
-# --------------------------------------------------
+# ---------------------------------------------------------
+# PUBLIC API — CONTEXT → TEKST VOOR MODEL
+# ---------------------------------------------------------
 def build_context_text(ctx: Dict[str, Any]) -> str:
     """
-    Bouwt een verhalende contexttekst voor het model.
+    Zet context om naar verhalende instructie voor Peet.
     Leest ctx, muteert niets.
     """
 
@@ -96,104 +118,67 @@ def build_context_text(ctx: Dict[str, Any]) -> str:
 
     days = ctx["days"]
     persons = ctx["persons"]
-    vegetarian = ctx["vegetarian"]
-    allergies = ctx["allergies"]
-    moment = ctx["moment"]
-    time = ctx["time"]
-    ambition = ctx["ambition"]
-    kitchen = ctx["keuken"]
 
-    # --- Basis ---
-    if days > 1:
-        lines.append("De gebruiker vraagt om een vooruit-keuze voor meerdere dagen.")
-    else:
+    # Basis
+    if days == 1:
         lines.append("De gebruiker vraagt om een keuze voor vandaag.")
+    else:
+        lines.append(f"De gebruiker vraagt om een vooruit-planning voor {days} dagen.")
 
     lines.append(
         f"Er wordt gekookt voor {persons} persoon{'en' if persons > 1 else ''}."
     )
 
-    # --- Moment & tijd ---
-    if moment == "weekend":
+    # Allergieën & no-go
+    if ctx["allergies"]:
         lines.append(
-            "De context is een ontspannen weekendsetting met ruimte voor aandacht en smaak."
+            f"De gerechten mogen geen {_list_to_sentence(ctx['allergies'])} bevatten."
         )
+
+    if ctx["nogo"]:
+        lines.append(
+            f"Vermijd nadrukkelijk {_list_to_sentence(ctx['nogo'])}."
+        )
+
+    # 1 dag → gebruiker stuurt
+    if days == 1:
+        if ctx["vegetarian"]:
+            lines.append("De gerechten moeten volledig vegetarisch zijn.")
+
+        if ctx["kitchen"]:
+            lines.append(
+                f"De smaakrichting is {ctx['kitchen'].replace('_', ' ')}."
+            )
+
+        lines.append(
+            "Het gerecht moet passen bij dit moment en praktisch zijn om thuis te koken."
+        )
+
+    # Vooruit → Peet beslist
     else:
+        kitchens = ctx["kitchens"]
+        if kitchens:
+            lines.append(
+                "Gebruik de volgende keukenprofielen per dag, in deze volgorde:"
+            )
+            for i, k in enumerate(kitchens, start=1):
+                lines.append(f"Dag {i}: {k.replace('_', ' ')}")
+
         lines.append(
-            "De context is doordeweeks en vraagt om praktische, realistische gerechten."
+            "Zorg voor variatie tussen dagen zonder herhaling van dominante ingrediënten "
+            "of kruiden. De reeks moet rustig en samenhangend aanvoelen."
         )
 
-    if time == "snel":
-        lines.append(
-            "Er is beperkte kooktijd; eenvoud en tempo zijn belangrijk."
-        )
-    else:
-        lines.append(
-            "Er is voldoende tijd om te koken, zonder behoefte aan complexiteit of gedoe."
-        )
-
-    # --- Dieet & allergieën ---
-    if vegetarian:
-        lines.append("De gerechten moeten volledig vegetarisch zijn.")
-
-    if allergies:
-        lines.append(
-            f"De gerechten mogen geen {_list_to_sentence(allergies)} bevatten. "
-            "Dit zijn harde grenzen."
-        )
-
-    # --- Keuken ---
-    if kitchen:
-        lines.append(
-            f"De gebruiker kiest voor de {kitchen.replace('_', ' ')} keuken als smaakrichting."
-        )
-        lines.append(
-            "De keuken bepaalt de stijl en signatuur van de gerechten, "
-            "niet vaste ingrediënten of structuren."
-        )
-        lines.append(
-            "Vermijd stereotiepe herhaling en clichés."
-        )
-
-    # --- Variatie ---
-    if days > 1:
-        lines.append(
-            "Variatie tussen dagen is belangrijk. Gerechten mogen verschillen in karakter "
-            "en opbouw, maar moeten samenhangend aanvoelen als één reeks."
-        )
-        lines.append(
-            "De eerste dag mag lichter zijn, opvolgende dagen iets voller, "
-            "zonder zwaarder of ingewikkelder te worden."
-        )
-
-    # --- Ambitie ---
-    if ambition <= 2:
-        lines.append(
-            "Het ambitieniveau is laag: focus op comfort, helderheid en rust."
-        )
-    elif ambition == 3:
-        lines.append(
-            "Het ambitieniveau is middelmatig: aandacht voor smaak en balans, "
-            "zonder specialistische technieken."
-        )
-    else:
-        lines.append(
-            "Het ambitieniveau is hoger: meer gelaagdheid en verfijning, "
-            "maar altijd haalbaar voor een thuiskok."
-        )
-
-    # --- Verwachting ---
     lines.append(
-        "Kies gerechten die realistisch zijn om thuis te koken en die passen bij dit moment, "
-        "zonder uitleg of verantwoording in de output."
+        "Kies gerechten zonder uitleg of verantwoording in de output."
     )
 
     return "\n".join(lines)
 
 
-# --------------------------------------------------
+# ---------------------------------------------------------
 # HELPERS
-# --------------------------------------------------
+# ---------------------------------------------------------
 def _to_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
