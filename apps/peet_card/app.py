@@ -66,31 +66,39 @@ else:
 with st.spinner("Peet is aan het kiezen…"):
     result = call_peet(context)
 
-# ---------------------------------------------------------
-# RENDER RESULTAAT
-# ---------------------------------------------------------
-days_out = result.get("days", [])
+# ============================
+# RESULTAAT RENDEREN (ALLE DAGEN)
+# ============================
 
-for idx, day in enumerate(days_out, start=1):
-    if context["days"] > 1:
-        st.markdown(f"## Dag {idx}")
+days = result.get("days", [])
 
-    st.markdown(f"### {day.get('dish_name', '')}")
+if not days:
+    st.error("Peet kon geen gerechten kiezen.")
+else:
+    for day in days:
+        day_nr = day.get("day")
+        dish_name = day.get("dish_name", "")
+        why = day.get("why", "")
 
-    if day.get("why"):
-        st.markdown(day["why"])
+        st.markdown(f"## Dag {day_nr}")
+        st.markdown(f"### {dish_name}")
 
-    if day.get("description"):
-        st.markdown(day["description"])
+        if why:
+            st.markdown(why)
 
-    st.markdown("---")
+        st.markdown("---")
+
 
 # ---------------------------------------------------------
 # PDF DOWNLOAD
 # ---------------------------------------------------------
-pdf_buffer, pdf_filename = build_plan_pdf(result)
+# PDF tijdelijk uitgeschakeld voor schermvalidatie
+# pdf_buffer, pdf_filename = build_plan_pdf(result)
+# st.download_button(...)
 
-st.download_button(
+#pdf_buffer, pdf_filename = build_plan_pdf(result)
+
+#st.download_button(
     label="Download als PDF",
     data=pdf_buffer,
     file_name=pdf_filename,
