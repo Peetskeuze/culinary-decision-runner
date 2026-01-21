@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Zorg dat project-root op sys.path staat (voor Streamlit Cloud)
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import streamlit as st
 from datetime import datetime
 
@@ -92,7 +100,7 @@ def _build_context() -> dict:
     ambition = _to_int(_qp_get("ambition", "2"), 2)
     ambition = max(1, min(4, ambition))
 
-    language = (_qp_get("language", "nl") or "nl").lower()
+    language = st.query_params.get("language", "nl").lower()
     if language not in ("nl", "en"):
         language = "nl"
 
