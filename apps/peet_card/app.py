@@ -92,15 +92,11 @@ else:
 # ---------------------------------------------------------
 # PDF DOWNLOAD
 # ---------------------------------------------------------
-# PDF tijdelijk uitgeschakeld voor schermvalidatie
-# pdf_buffer, pdf_filename = build_plan_pdf(result)
-# st.download_button(...)
+pdf_buffer, pdf_filename = build_plan_pdf(result)
 
-#pdf_buffer, pdf_filename = build_plan_pdf(result)
-
-#st.download_button(
+st.download_button(
     label="Download als PDF",
     data=pdf_buffer,
     file_name=pdf_filename,
     mime="application/pdf",
-#)
+)
