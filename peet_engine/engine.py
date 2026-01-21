@@ -325,12 +325,20 @@ def _pick_dish(
     if not candidates:
         return None
 
-    # deterministisch: alfabetisch
+    # -------------------------------------------------
+    # VARIATIE-SEED (deterministisch, niet random)
+    # -------------------------------------------------
+    seed = ctx.get("variation_seed", 0)
+
+    # vaste, stabiele sortering
     candidates.sort(
         key=lambda d: d.name_en if language == "en" else d.name_nl
     )
 
-    return candidates[0]
+    # seed bepaalt startpunt
+    index = seed % len(candidates)
+
+    return candidates[index]
 
 
 
