@@ -68,10 +68,30 @@ def _effective_days() -> int:
         return days
     return 1
 
+# =========================================================
+# Variatie-seed (Stap 1)
+# =========================================================
+def _variation_seed(days: int) -> int:
+    """
+    Zorgt voor gecontroleerde variatie.
+    - 1 dag: veel variatie (tijd-gebaseerd)
+    - 2/3/5 dagen: stabiel per dag, maar wisselt per kalenderdag
+    """
+    now = datetime.now()
+
+    if days == 1:
+        # verandert elke run / refresh
+        return int(now.timestamp())
+
+    # vooruit: elke dag andere seed, maar stabiel binnen die dag
+    return int(now.strftime("%Y%m%d"))
+
 
 def _build_context() -> dict:
     days = _effective_days()
     mode = "vooruit" if days in (2, 3, 5) else "vandaag"
+
+    variation_seed = _variation_seed(days)
 
     persons = _to_int(_qp_get("persons", "2"), 2)
     persons = max(1, min(12, persons))
@@ -92,7 +112,9 @@ def _build_context() -> dict:
             "vegetarian": vegetarian,
             "allergies": allergies,
             "language": language,
-        }
+            "variation_seed": variation_seed,
+}
+
 
     # 1 dag: alles mag mee
     moment = (_qp_get("moment", "doordeweeks") or "doordeweeks").lower()
@@ -124,7 +146,9 @@ def _build_context() -> dict:
         "kitchen": kitchen,
         "fridge": fridge,
         "nogo": nogo,
+        "variation_seed": variation_seed,
     }
+
 
 
 # =========================================================
