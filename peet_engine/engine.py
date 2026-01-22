@@ -99,86 +99,126 @@ DISHES: List[Dish] = [
 # -----------------------------
 # Public API
 # -----------------------------
+from typing import Dict, Any, List, Set
+
+
 def plan(context: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deterministic engine: context -> choice plan.
-    No LLM. No UI.
+    - Geen UI
+    - Geen LLM-calls hier
+    - Wel: expliciete output voor UI en PDF
     """
+
+    # =============================
+    # 1. Context normalisatie
+    # =============================
     ctx = _normalize_context(context)
-    days = ctx["days"]
 
-    # -----------------------------
-    # Vast ritme (afdwingen)
-    # -----------------------------
-    profiles = determine_day_profiles(days)
-    kitchens = determine_kitchen_sequence(days)
+    days: int = ctx["days"]
+    persons: int = ctx["persons"]
+    language: str = ctx["language"]
 
-    # ambition normalization
-    ambition = _apply_ambition_caps(ctx)
-    ambition_by_day = _spread_ambition(days=days, base=ambition)
+    # =============================
+    # 2. Vast ritme afdwingen
+    # =============================
+    profiles: List[str] = determine_day_profiles(days)
+    kitchens: List[str] = determine_kitchen_sequence(days)
 
+    # Ambition: genormaliseerd + gespreid
+    base_ambition: int = _apply_ambition_caps(ctx)
+    ambition_by_day: List[int] = _spread_ambition(
+        days=days,
+        base=base_ambition,
+    )
+
+    # =============================
+    # 3. Dag-voor-dag keuzes
+    # =============================
     out_days: List[Dict[str, Any]] = []
-    used_names: set[str] = set()
+    used_names: Set[str] = set()
 
-    # -----------------------------
-    # Dag-voor-dag keuze
-    # -----------------------------
-    for idx, (profile, kitchen) in enumerate(
-        zip(profiles, kitchens), start=1
-    ):
-        day_amb = ambition_by_day[idx - 1]
+    for idx in range(days):
+        profile = profiles[idx]
+        kitchen = kitchens[idx]
+        day_ambition = ambition_by_day[idx]
 
         dish = _pick_dish(
             profile=profile,
             kitchen=kitchen,
             vegetarian=ctx["vegetarian"],
             allergies=ctx["allergies"],
-            language=ctx["language"],
+            language=language,
             used_names=used_names,
             moment=ctx["moment"],
             time=ctx["time"],
-            ambition=day_amb,
-            variation_seed=ctx.get("variation_seed", 0) + idx,
+            ambition=day_ambition,
+            variation_seed=ctx.get("variation_seed", 0) + idx + 1,
         )
 
-
+        # Harde fallback (mag nooit None blijven)
         if dish is None:
             dish = _fallback_pick(
                 profile=profile,
                 kitchen=kitchen,
                 vegetarian=ctx["vegetarian"],
                 allergies=ctx["allergies"],
-                language=ctx["language"],
+                language=language,
                 used_names=used_names,
             )
 
-        name = dish.name_en if ctx["language"] == "en" else dish.name_nl
-        used_names.add(name)
+        dish_name = dish.name_en if language == "en" else dish.name_nl
+        used_names.add(dish_name)
 
-        out_days.append(
-            {
-                "day": idx,
-                "profile": profile,
-                "kitchen": kitchen,
-                "dish_name": name,
-                "ambition": day_amb,
-                "why": _why_line(
-                    language=ctx["language"],
-                    profile=profile,
-                    kitchen=kitchen,
-                    moment=ctx["moment"],
-                    time=ctx["time"],
-                    ambition=day_amb,
-                ),
-            }
-        )
+        # =============================
+        # 4. Dag-output (rijk, maar stabiel)
+        # =============================
+        day_out: Dict[str, Any] = {
+            "day": idx + 1,
+            "profile": profile,
+            "kitchen": kitchen,
+            "dish_name": dish_name,
+            "ambition": day_ambition,
+            "why": _why_line(
+                language=language,
+                profile=profile,
+                kitchen=kitchen,
+                moment=ctx["moment"],
+                time=ctx["time"],
+                ambition=day_ambition,
+            ),
+        }
 
-    return {
+        # Optioneel verrijken (alleen als aanwezig)
+        if hasattr(dish, "recipe_text") and dish.recipe_text:
+            day_out["recipe_text"] = dish.recipe_text
+
+        if hasattr(dish, "recipe_steps") and dish.recipe_steps:
+            day_out["recipe_steps"] = dish.recipe_steps
+
+        if hasattr(dish, "ingredients") and dish.ingredients:
+            day_out["ingredients"] = dish.ingredients
+
+        out_days.append(day_out)
+
+    # =============================
+    # 5. Resultaat (engine-contract)
+    # =============================
+    result: Dict[str, Any] = {
         "days_count": days,
-        "persons": ctx["persons"],
+        "persons": persons,
         "days": out_days,
     }
 
+    # Convenience voor Peet-Card (dag 1 centraal)
+    if out_days:
+        first_day = out_days[0]
+        if "recipe_text" in first_day:
+            result["recipe_text"] = first_day["recipe_text"]
+        if "recipe_steps" in first_day:
+            result["recipe_steps"] = first_day["recipe_steps"]
+
+    return result
 
 
 # -----------------------------
