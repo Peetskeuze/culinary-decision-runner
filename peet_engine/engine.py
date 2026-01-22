@@ -138,7 +138,9 @@ def plan(context: Dict[str, Any]) -> Dict[str, Any]:
             moment=ctx["moment"],
             time=ctx["time"],
             ambition=day_amb,
+            variation_seed=ctx.get("variation_seed", 0) + idx,
         )
+
 
         if dish is None:
             dish = _fallback_pick(
@@ -254,7 +256,10 @@ def _normalize_context(raw: Dict[str, Any]) -> Dict[str, Any]:
         "time": time,
         "ambition": ambition,
         "language": language,
+        # 🔽 ESSENTIEEL: variatie-seed doorgeven
+        "variation_seed": int(raw.get("variation_seed", 0)),
     }
+
 
 
 def _apply_ambition_caps(ctx: Dict[str, Any]) -> int:
@@ -295,7 +300,9 @@ def _pick_dish(
     moment: str,
     time: str,
     ambition: int,
+    variation_seed: int,
 ) -> Optional[Dish]:
+
     candidates: list[Dish] = []
 
     for d in DISHES:
@@ -325,10 +332,9 @@ def _pick_dish(
     if not candidates:
         return None
 
-    # -------------------------------------------------
     # VARIATIE-SEED (deterministisch, niet random)
-    # -------------------------------------------------
-    seed = ctx.get("variation_seed", 0)
+    seed = variation_seed or 0
+
 
     # vaste, stabiele sortering
     candidates.sort(

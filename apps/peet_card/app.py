@@ -130,7 +130,18 @@ def main():
 
     # Bereiding op scherm
     st.subheader("Zo pak je het aan")
-    st.write(result.get("recipe_text", "Bereiding niet beschikbaar."))
+
+    preparation = None
+    if result.get("days"):
+        day = result["days"][0]
+        preparation = (
+            day.get("recipe_text")
+            or day.get("steps")
+            or day.get("description")
+        )
+
+    st.write(preparation or "Bereiding niet beschikbaar.")
+
 
     # 3) PDF
     pdf_buffer, filename = build_plan_pdf(result)
