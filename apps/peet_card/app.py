@@ -111,7 +111,6 @@ def main():
     narrative = " ".join(lines[1:]) if len(lines) > 1 else ""
 
     st.subheader(dish_name)
-    if narrative:
 
     st.divider()
 
