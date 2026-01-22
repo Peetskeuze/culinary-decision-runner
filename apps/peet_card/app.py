@@ -101,21 +101,25 @@ def main():
         st.warning("Voor 2/3/5 dagen vooruit: gebruik Peet Kiest Vooruit.")
         st.stop()
 
-    # 1) Peet kiest vrij (LLM)
+    # -------------------------------------------------
+    # 1) LLM: gerecht + volledige bereiding (tekst)
+    # -------------------------------------------------
     with st.spinner("Peet is aan het kiezen…"):
         free_text = call_peet_text(llm_context)
 
-    # Verwacht: eerste regel = gerechtnaam, rest = korte motivatie
     lines = [l.strip() for l in free_text.splitlines() if l.strip()]
-    dish_name = lines[0]
-    narrative = " ".join(lines[1:]) if len(lines) > 1 else ""
+
+    dish_name = lines[0] if lines else "Peet kiest iets lekkers"
+    recipe_text = "\n\n".join(lines[1:]) if len(lines) > 1 else free_text
 
     st.subheader(dish_name)
-
     st.divider()
 
-    # 2) Engine werkt uit (bereiding + structuur)
+    # -------------------------------------------------
+    # 2) Engine: structuur voor PDF
+    # -------------------------------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
+
     engine_context = {
         "days": 1,
         "persons": persons,
@@ -126,34 +130,31 @@ def main():
 
     result = plan(engine_context)
 
+    # Injecteer bereiding expliciet (cruciaal)
+    if result.get("days"):
+        result["days"][0]["recipe_text"] = recipe_text
 
-    # Bereiding op scherm
+    # -------------------------------------------------
+    # 3) UI: altijd tekst tonen
+    # -------------------------------------------------
     st.subheader("Zo pak je het aan")
 
-    day1 = result["days"][0]
-
-    # 1. Prefer full recipe_text
-    if isinstance(day1.get("recipe_text"), str):
-        st.write(day1["recipe_text"])
-
-    # 2. Fallback: stappenlijst
-    elif isinstance(day1.get("recipe_steps"), list):
-        for i, step in enumerate(day1["recipe_steps"], start=1):
-            st.markdown(f"**Stap {i}**  \n{step}")
-
-    # 3. Laatste fallback
+    if recipe_text and isinstance(recipe_text, str):
+        st.write(recipe_text)
     else:
         st.write("Bereiding niet beschikbaar.")
 
-    # 3) PDF
+    # -------------------------------------------------
+    # 4) PDF: altijd iets zinnigs
+    # -------------------------------------------------
     pdf_buffer, filename = build_plan_pdf(result)
+
     st.download_button(
         label="Download als PDF",
         data=pdf_buffer.getvalue(),
         file_name=filename,
-        mime="application/pdf"
+        mime="application/pdf",
     )
-
 
 
 if __name__ == "__main__":
