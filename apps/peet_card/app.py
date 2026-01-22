@@ -7,6 +7,8 @@
 import sys
 from pathlib import Path
 import streamlit as st
+import json
+
 
 # -------------------------------------------------
 # Bootstrap: project-root in sys.path (lokaal + cloud)
@@ -105,12 +107,32 @@ def main():
     # 1) LLM: gerecht + volledige bereiding (tekst)
     # -------------------------------------------------
     with st.spinner("Peet is aan het kiezen…"):
-        free_text = call_peet_text(llm_context)
+    free_text = call_peet_text(llm_context)
 
-    lines = [l.strip() for l in free_text.splitlines() if l.strip()]
+    dish_name = "Peet kiest iets lekkers"
+    recipe_text = ""
 
-    dish_name = lines[0] if lines else "Peet kiest iets lekkers"
-    recipe_text = "\n\n".join(lines[1:]) if len(lines) > 1 else free_text
+    # Probeer JSON te parsen
+    try:
+        data = json.loads(free_text)
+
+        dish_name = data.get("dish_name", dish_name)
+
+        if isinstance(data.get("recipe_text"), str):
+            recipe_text = data["recipe_text"]
+
+        elif isinstance(data.get("recipe_steps"), list):
+            recipe_text = "\n".join(
+                f"Stap {i+1}. {step}" for i, step in enumerate(data["recipe_steps"])
+            )
+
+        else:
+            recipe_text = free_text  # fallback
+
+    except Exception:
+        # Geen JSON → gewoon tekst
+        recipe_text = free_text
+
 
     st.subheader(dish_name)
     st.divider()
