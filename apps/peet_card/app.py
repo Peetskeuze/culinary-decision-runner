@@ -259,7 +259,9 @@ def build_context_from_query(query: dict) -> dict:
     """
     Keihard inputcontract voor Peet-Card.
 
-    - days == 1  → vandaag: alles telt mee + gecontroleerde chef-inspiratie
+    - days == 1  → vandaag: alles telt mee
+      + chef-inspiratie
+      + anti-herhaling hoofdingrediënt
     - days > 1   → vooruit: alleen persons, allergies, nogo
     """
 
@@ -296,6 +298,16 @@ def build_context_from_query(query: dict) -> dict:
         random.seed(seed_hint)
         chef = random.choice(TODAY_CHEFS)
 
+        # -------------------------
+        # Anti-herhaling (nieuw)
+        # -------------------------
+        # optioneel: vorige proteïne meegeven via query
+        last_protein = query.get("last_protein")
+
+        avoid_ingredients = []
+        if last_protein:
+            avoid_ingredients.append(last_protein)
+
         context = {
             "mode": "today",
             "days": 1,
@@ -311,15 +323,17 @@ def build_context_from_query(query: dict) -> dict:
             "fridge": clean_list(query.get("fridge", "")),
             "ambition": int(query.get("ambition", 3)),
 
-            # 🔑 expliciete verrijking
+            # verrijking
             "chef_inspiration": chef,
+
+            # 🔒 anti-herhaling
+            "avoid_ingredients": avoid_ingredients,
         }
 
-        # expliciet opschonen
-        return {k: v for k, v in context.items() if v not in (None, "", [])}
+        return {k: v for k, v in context.items() if v not in (None, "", [], {})}
 
     # =========================
-    # DAG = VOORUIT
+    # DAG = VOORUIT (onaangetast)
     # =========================
     return {
         "mode": "forward",
@@ -328,19 +342,6 @@ def build_context_from_query(query: dict) -> dict:
         "allergies": allergies,
         "nogo": nogo,
     }
-
-    # =========================
-    # DAG = VOORUIT
-    # =========================
-    context = {
-        "mode": "forward",
-        "days": days,
-        "persons": persons,
-        "allergies": allergies,
-        "nogo": nogo,
-    }
-
-    return context
 
 # =========================================================
 # UI
