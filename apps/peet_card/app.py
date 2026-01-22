@@ -12,6 +12,72 @@ from datetime import datetime
 from peet_engine.run import call_peet
 from peet_engine.render_pdf import build_plan_pdf
 
+# -------------------------------------------------
+# Input reduction – Peet-Card
+# -------------------------------------------------
+
+def reduce_input(raw: dict) -> dict:
+    """
+    Reduce raw input (query params / form input) to the explicit
+    input contract for Peet-Card.
+
+    - Drops all unknown keys
+    - Enforces today vs forward separation
+    - Applies minimal, explicit defaults only
+    """
+
+    if not isinstance(raw, dict):
+        raise ValueError("Input must be a dict")
+
+    mode = raw.get("mode")
+
+    if mode not in ("today", "forward"):
+        raise ValueError("Invalid or missing mode")
+
+    reduced = {"mode": mode}
+
+    if mode == "today":
+        allowed = {
+            "persons",
+            "moment",
+            "time",
+            "vegetarian",
+            "allergies",
+            "nogo",
+            "ambition",
+            "language",
+        }
+
+        for key in allowed:
+            if key in raw:
+                reduced[key] = raw[key]
+
+        # minimal defaults
+        reduced.setdefault("vegetarian", False)
+        reduced.setdefault("language", "nl")
+
+    elif mode == "forward":
+        allowed = {
+            "days",
+            "persons",
+            "vegetarian",
+            "allergies",
+        }
+
+        for key in allowed:
+            if key in raw:
+                reduced[key] = raw[key]
+
+        # minimal defaults
+        reduced.setdefault("vegetarian", False)
+
+        if "days" not in reduced:
+            raise ValueError("Forward mode requires 'days'")
+
+        if reduced["days"] not in (2, 3, 5):
+            raise ValueError("Forward mode allows only 2, 3 or 5 days")
+
+    return reduced
 
 # =========================================================
 # Helpers
@@ -149,15 +215,43 @@ def _build_context() -> dict:
         "variation_seed": variation_seed,
     }
 
-
-
 # =========================================================
 # UI
 # =========================================================
 st.set_page_config(page_title="Peet kiest", page_icon="🍽️", layout="centered")
 
-ctx = _build_context()
-days = ctx["days"]
+# -------------------------------------------------
+# Enforced input flow (contract → reduction → normalize → context)
+# -------------------------------------------------
+
+# 1) Rauwe input verzamelen (query params)
+raw_input = {
+    "mode": "forward" if _effective_days() in (2, 3, 5) else "today",
+    "days": _effective_days(),
+    "persons": _to_int(_qp_get("persons", "2"), 2),
+    "vegetarian": _to_bool(_qp_get("vegetarian", None), False),
+    "allergies": _to_list(_qp_get("allergies", "")),
+    "moment": _qp_get("moment", None),
+    "time": _qp_get("time", None),
+    "ambition": _to_int(_qp_get("ambition", None), 2),
+    "language": (_qp_get("language", "nl") or "nl").lower(),
+    "nogo": _qp_get("nogo", None),
+}
+
+# 2) Reduceren naar expliciet contract
+try:
+    reduced_input = reduce_input(raw_input)
+except ValueError as e:
+    st.error(str(e))
+    st.stop()
+
+# 3) Normalisatie (alleen op gereduceerde input)
+normalized_input = normalize_input(reduced_input)
+
+# 4) Context bouwen (engine ziet NOOIT raw input)
+ctx = build_context(normalized_input)
+
+days = ctx.get("days", 1)
 
 if days == 1:
     st.title("Peet kiest. Jij hoeft alleen te koken.")
