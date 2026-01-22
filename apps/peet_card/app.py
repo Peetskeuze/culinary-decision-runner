@@ -130,18 +130,22 @@ def main():
 
 
     # Bereiding op scherm
-    day1 = result["days"][0]
-
     st.subheader("Zo pak je het aan")
 
-    if "recipe_text" in day1:
-        st.write(day1["recipe_text"])
-    else:
-        st.write("Bereiding niet beschikbaar.")
+    day1 = result["days"][0]
 
-    if "recipe_steps" in day1:
+    # 1. Prefer full recipe_text
+    if isinstance(day1.get("recipe_text"), str):
+        st.write(day1["recipe_text"])
+
+    # 2. Fallback: stappenlijst
+    elif isinstance(day1.get("recipe_steps"), list):
         for i, step in enumerate(day1["recipe_steps"], start=1):
             st.markdown(f"**Stap {i}**  \n{step}")
+
+    # 3. Laatste fallback
+    else:
+        st.write("Bereiding niet beschikbaar.")
 
     # 3) PDF
     pdf_buffer, filename = build_plan_pdf(result)
