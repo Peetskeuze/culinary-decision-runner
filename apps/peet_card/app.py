@@ -232,20 +232,47 @@ def _variation_seed(days: int) -> int:
     # vooruit: elke dag andere seed, maar stabiel binnen die dag
     return int(now.strftime("%Y%m%d"))
 
+import random
+
+TODAY_CHEFS = [
+    "ottolenghi",
+    "jeroen_meus",
+    "nigella_lawson",
+    "yotam_ottolenghi",
+    "massimo_bottura",
+    "alain_ducasse",
+    "peet_eigen_stijl",
+]
+
+def pick_today_chef(seed_hint: str | None = None) -> str:
+    """
+    Kies exact één chef-inspiratie voor vandaag.
+    - Alleen voor today
+    - Geen stacking
+    - Licht random, maar stabiel genoeg
+    """
+    if seed_hint:
+        random.seed(seed_hint)
+    return random.choice(TODAY_CHEFS)
 
 def build_context_from_query(query: dict) -> dict:
     """
     Keihard inputcontract voor Peet-Card.
-    - days == 1  → vandaag: alles telt mee
+
+    - days == 1  → vandaag: alles telt mee + gecontroleerde chef-inspiratie
     - days > 1   → vooruit: alleen persons, allergies, nogo
     """
+
+    import random
 
     def clean_list(value: str) -> list:
         if not value:
             return []
         return [v.strip() for v in value.split(",") if v.strip()]
 
-    # --- verplichte basis ---
+    # -------------------------
+    # Basis (altijd verplicht)
+    # -------------------------
     days = int(query.get("days", 1))
     persons = int(query.get("persons", 2))
     allergies = clean_list(query.get("allergies", ""))
@@ -255,6 +282,20 @@ def build_context_from_query(query: dict) -> dict:
     # DAG = VANDAAG
     # =========================
     if days == 1:
+        TODAY_CHEFS = [
+            "ottolenghi",
+            "jeroen_meus",
+            "nigella_lawson",
+            "massimo_bottura",
+            "alain_ducasse",
+            "peet_eigen_stijl",
+        ]
+
+        # lichte, gecontroleerde variatie
+        seed_hint = query.get("moment") or query.get("kitchen") or ""
+        random.seed(seed_hint)
+        chef = random.choice(TODAY_CHEFS)
+
         context = {
             "mode": "today",
             "days": 1,
@@ -269,10 +310,24 @@ def build_context_from_query(query: dict) -> dict:
             "kitchen": query.get("kitchen"),
             "fridge": clean_list(query.get("fridge", "")),
             "ambition": int(query.get("ambition", 3)),
+
+            # 🔑 expliciete verrijking
+            "chef_inspiration": chef,
         }
 
-        # expliciet verwijderen wat None is
+        # expliciet opschonen
         return {k: v for k, v in context.items() if v not in (None, "", [])}
+
+    # =========================
+    # DAG = VOORUIT
+    # =========================
+    return {
+        "mode": "forward",
+        "days": days,
+        "persons": persons,
+        "allergies": allergies,
+        "nogo": nogo,
+    }
 
     # =========================
     # DAG = VOORUIT
