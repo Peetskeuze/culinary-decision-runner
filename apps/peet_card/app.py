@@ -128,20 +128,20 @@ def main():
 
     result = plan(engine_context)
 
+
     # Bereiding op scherm
+    day1 = result["days"][0]
+
     st.subheader("Zo pak je het aan")
 
-    preparation = None
-    if result.get("days"):
-        day = result["days"][0]
-        preparation = (
-            day.get("recipe_text")
-            or day.get("steps")
-            or day.get("description")
-        )
+    if "recipe_text" in day1:
+        st.write(day1["recipe_text"])
+    else:
+        st.write("Bereiding niet beschikbaar.")
 
-    st.write(preparation or "Bereiding niet beschikbaar.")
-
+    if "recipe_steps" in day1:
+        for i, step in enumerate(day1["recipe_steps"], start=1):
+            st.markdown(f"**Stap {i}**  \n{step}")
 
     # 3) PDF
     pdf_buffer, filename = build_plan_pdf(result)
