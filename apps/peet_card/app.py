@@ -20,8 +20,7 @@ if str(ROOT) not in sys.path:
 # -------------------------------------------------
 from core.llm import call_peet_text
 from peet_engine.engine import plan
-import peet_engine.render_pdf as pdf_renderer
-
+from peet_engine.render_pdf import render_pdf
 
 # -------------------------------------------------
 # Helpers
@@ -133,7 +132,7 @@ def main():
     st.write(result.get("recipe_text", "Bereiding niet beschikbaar."))
 
     # 3) PDF
-    pdf_bytes = pdf_renderer.render(result)
+    pdf_bytes = render_pdf(result)
     st.download_button(
         label="Download recept & boodschappen (PDF)",
         data=pdf_bytes,
