@@ -233,67 +233,59 @@ def _variation_seed(days: int) -> int:
     return int(now.strftime("%Y%m%d"))
 
 
-def _build_context() -> dict:
-    days = _effective_days()
-    mode = "vooruit" if days in (2, 3, 5) else "vandaag"
+def build_context_from_query(query: dict) -> dict:
+    """
+    Keihard inputcontract voor Peet-Card.
+    - days == 1  → vandaag: alles telt mee
+    - days > 1   → vooruit: alleen persons, allergies, nogo
+    """
 
-    variation_seed = _variation_seed(days)
+    def clean_list(value: str) -> list:
+        if not value:
+            return []
+        return [v.strip() for v in value.split(",") if v.strip()]
 
-    persons = _to_int(_qp_get("persons", "2"), 2)
-    persons = max(1, min(12, persons))
+    # --- verplichte basis ---
+    days = int(query.get("days", 1))
+    persons = int(query.get("persons", 2))
+    allergies = clean_list(query.get("allergies", ""))
+    nogo = clean_list(query.get("nogo", ""))
 
-    vegetarian = _to_bool(_qp_get("vegetarian", None), False)
-    allergies = _to_list(_qp_get("allergies", ""))
-
-    # 2/3/5 dagen: alleen contractvelden doorgeven, rest negeren
-    if mode == "vooruit":
-        language = (_qp_get("language", "nl") or "nl").lower()
-        if language not in ("nl", "en"):
-            language = "nl"
-
-        return {
-            "mode": "vooruit",
-            "days": days,
+    # =========================
+    # DAG = VANDAAG
+    # =========================
+    if days == 1:
+        context = {
+            "mode": "today",
+            "days": 1,
             "persons": persons,
-            "vegetarian": vegetarian,
             "allergies": allergies,
-            "language": language,
-            "variation_seed": variation_seed,
-}
+            "nogo": nogo,
 
+            # alles mag meetellen
+            "time": query.get("time"),
+            "moment": query.get("moment"),
+            "preference": query.get("preference"),
+            "kitchen": query.get("kitchen"),
+            "fridge": clean_list(query.get("fridge", "")),
+            "ambition": int(query.get("ambition", 3)),
+        }
 
-    # 1 dag: alles mag mee
-    moment = (_qp_get("moment", "doordeweeks") or "doordeweeks").lower()
-    time = (_qp_get("time", "normaal") or "normaal").lower()
-    ambition = _to_int(_qp_get("ambition", "2"), 2)
-    ambition = max(1, min(4, ambition))
+        # expliciet verwijderen wat None is
+        return {k: v for k, v in context.items() if v not in (None, "", [])}
 
-    language = st.query_params.get("language", "nl").lower()
-    if language not in ("nl", "en"):
-        language = "nl"
-
-    # Extra velden (engine mag ze negeren, maar app accepteert ze)
-    preference = _qp_get("preference", "")
-    kitchen = _qp_get("kitchen", "")
-    fridge = _qp_get("fridge", "")
-    nogo = _qp_get("nogo", "")
-
-    return {
-        "mode": "vandaag",
-        "days": 1,
+    # =========================
+    # DAG = VOORUIT
+    # =========================
+    context = {
+        "mode": "forward",
+        "days": days,
         "persons": persons,
-        "vegetarian": vegetarian,
         "allergies": allergies,
-        "moment": moment,
-        "time": time,
-        "ambition": ambition,
-        "language": language,
-        "preference": preference,
-        "kitchen": kitchen,
-        "fridge": fridge,
         "nogo": nogo,
-        "variation_seed": variation_seed,
     }
+
+    return context
 
 # =========================================================
 # UI
