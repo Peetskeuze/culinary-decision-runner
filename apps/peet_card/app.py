@@ -1,17 +1,23 @@
-# app.py — bootstrap
+# apps/peet_card/app.py
+# Peet-Card — Vandaag (LLM-only)
+
 import sys
 from pathlib import Path
 
+# -------------------------------------------------
+# Bootstrap: project-root in sys.path
+# -------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# app.py
 import streamlit as st
 from typing import Dict, Any
+import time
+import random
 
 from core.llm import call_peet
-from core.engine import plan
+
 
 # -------------------------------------------------
 # Helpers
