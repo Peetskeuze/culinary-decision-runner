@@ -103,16 +103,18 @@ def main():
         st.warning("Voor 2/3/5 dagen vooruit: gebruik Peet Kiest Vooruit.")
         st.stop()
 
-    # -------------------------------------------------
-    # 1) LLM: gerecht + volledige bereiding (tekst)
-    # -------------------------------------------------
+    # 1) Peet kiest (LLM)
     with st.spinner("Peet is aan het kiezen…"):
-    free_text = call_peet_text(llm_context)
+        free_text = call_peet_text(llm_context)
+
+    # -----------------------------
+    # JSON veilig parsen
+    # -----------------------------
+    import json
 
     dish_name = "Peet kiest iets lekkers"
     recipe_text = ""
 
-    # Probeer JSON te parsen
     try:
         data = json.loads(free_text)
 
@@ -127,19 +129,16 @@ def main():
             )
 
         else:
-            recipe_text = free_text  # fallback
+            recipe_text = free_text
 
     except Exception:
-        # Geen JSON → gewoon tekst
         recipe_text = free_text
 
-
+    # Toon titel
     st.subheader(dish_name)
     st.divider()
 
-    # -------------------------------------------------
-    # 2) Engine: structuur voor PDF
-    # -------------------------------------------------
+    # 2) Engine (structuur + PDF)
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
     engine_context = {
@@ -152,30 +151,29 @@ def main():
 
     result = plan(engine_context)
 
-    # Injecteer bereiding expliciet (cruciaal)
-    if result.get("days"):
-        result["days"][0]["recipe_text"] = recipe_text
+    # Zorg dat recipe_text ook in result zit (voor PDF)
+    result["days"][0]["recipe_text"] = recipe_text
 
-    # -------------------------------------------------
-    # 3) UI: altijd tekst tonen
-    # -------------------------------------------------
+    # -----------------------------
+    # Bereiding op scherm
+    # -----------------------------
     st.subheader("Zo pak je het aan")
 
-    if recipe_text and isinstance(recipe_text, str):
+    if recipe_text.strip():
         st.write(recipe_text)
     else:
         st.write("Bereiding niet beschikbaar.")
 
-    # -------------------------------------------------
-    # 4) PDF: altijd iets zinnigs
-    # -------------------------------------------------
+    # -----------------------------
+    # PDF
+    # -----------------------------
     pdf_buffer, filename = build_plan_pdf(result)
 
     st.download_button(
         label="Download als PDF",
         data=pdf_buffer.getvalue(),
         file_name=filename,
-        mime="application/pdf",
+        mime="application/pdf"
     )
 
 
