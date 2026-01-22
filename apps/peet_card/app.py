@@ -20,7 +20,8 @@ if str(ROOT) not in sys.path:
 # -------------------------------------------------
 from core.llm import call_peet_text
 from peet_engine.engine import plan
-from peet_engine.render_pdf import render_pdf
+from peet_engine.render_pdf import build_plan_pdf
+
 
 # -------------------------------------------------
 # Helpers
@@ -132,13 +133,14 @@ def main():
     st.write(result.get("recipe_text", "Bereiding niet beschikbaar."))
 
     # 3) PDF
-    pdf_bytes = render_pdf(result)
+    pdf_buffer, filename = build_plan_pdf(result)
     st.download_button(
-        label="Download recept & boodschappen (PDF)",
-        data=pdf_bytes,
-        file_name="Peet_Kiest_Vandaag.pdf",
-        mime="application/pdf",
+        label="Download als PDF",
+        data=pdf_buffer.getvalue(),
+        file_name=filename,
+        mime="application/pdf"
     )
+
 
 
 if __name__ == "__main__":
