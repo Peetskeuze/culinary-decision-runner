@@ -18,67 +18,147 @@ from peet_engine.render_pdf import build_plan_pdf
 
 def reduce_input(raw: dict) -> dict:
     """
-    Reduce raw input (query params / form input) to the explicit
-    input contract for Peet-Card.
-
-    - Drops all unknown keys
-    - Enforces today vs forward separation
-    - Applies minimal, explicit defaults only
+    Reduce raw input to an explicit, mode-dependent contract.
+    - days == 1 (vandaag): ALLE relevante velden mogen mee
+    - days > 1 (vooruit): ALLEEN persons, allergies, nogo
     """
+    if "days" not in raw:
+        raise ValueError("days ontbreekt")
 
-    if not isinstance(raw, dict):
-        raise ValueError("Input must be a dict")
+    days = int(raw["days"])
 
-    mode = raw.get("mode")
-
-    if mode not in ("today", "forward"):
-        raise ValueError("Invalid or missing mode")
-
-    reduced = {"mode": mode}
-
-    if mode == "today":
+    # -----------------------------
+    # TODAY (days == 1)
+    # -----------------------------
+    if days == 1:
         allowed = {
-            "persons",
-            "moment",
-            "time",
-            "vegetarian",
-            "allergies",
-            "nogo",
-            "ambition",
-            "language",
-        }
-
-        for key in allowed:
-            if key in raw:
-                reduced[key] = raw[key]
-
-        # minimal defaults
-        reduced.setdefault("vegetarian", False)
-        reduced.setdefault("language", "nl")
-
-    elif mode == "forward":
-        allowed = {
+            "mode",
             "days",
             "persons",
             "vegetarian",
+            "preference",
+            "kitchen",
+            "fridge",
+            "time",
+            "moment",
+            "ambition",
             "allergies",
+            "nogo",
+            "language",
         }
 
-        for key in allowed:
-            if key in raw:
-                reduced[key] = raw[key]
+    # -----------------------------
+    # FORWARD (days > 1)
+    # -----------------------------
+    else:
+        allowed = {
+            "mode",
+            "days",
+            "persons",
+            "allergies",
+            "nogo",
+            "language",
+        }
 
-        # minimal defaults
-        reduced.setdefault("vegetarian", False)
-
-        if "days" not in reduced:
-            raise ValueError("Forward mode requires 'days'")
-
-        if reduced["days"] not in (2, 3, 5):
-            raise ValueError("Forward mode allows only 2, 3 or 5 days")
+    reduced = {}
+    for key in allowed:
+        if key in raw and raw[key] not in (None, "", []):
+            reduced[key] = raw[key]
 
     return reduced
 
+# -------------------------------------------------
+# Input normalization – Peet-Card
+# -------------------------------------------------
+
+def normalize_input(data: dict) -> dict:
+    """
+    Normalize reduced input to strict, engine-safe types.
+
+    Guarantees:
+    - ints are ints
+    - bools are bools
+    - lists are list[str]
+    - language is 'nl' or 'en'
+    """
+
+    out: dict = {}
+
+    # mode
+    out["mode"] = data["mode"]
+
+    # days
+    if "days" in data:
+        try:
+            days = int(data["days"])
+        except Exception:
+            raise ValueError("days must be an integer")
+
+        if days not in (1, 2, 3, 5):
+            raise ValueError("days must be 1, 2, 3 or 5")
+
+        out["days"] = days
+    else:
+        out["days"] = 1
+
+    # persons
+    try:
+        persons = int(data.get("persons", 1))
+    except Exception:
+        raise ValueError("persons must be an integer")
+
+    if persons < 1 or persons > 12:
+        raise ValueError("persons must be between 1 and 12")
+
+    out["persons"] = persons
+
+    # vegetarian
+    out["vegetarian"] = bool(data.get("vegetarian", False))
+
+    # allergies / nogo
+    def _norm_list(val) -> list[str]:
+        if not val:
+            return []
+        if isinstance(val, list):
+            return [str(v).strip().lower() for v in val if str(v).strip()]
+        if isinstance(val, str):
+            return [v.strip().lower() for v in val.split(",") if v.strip()]
+        raise ValueError("list fields must be list[str] or comma-separated string")
+
+    if "allergies" in data:
+        out["allergies"] = _norm_list(data.get("allergies"))
+    else:
+        out["allergies"] = []
+
+    if "nogo" in data:
+        out["nogo"] = _norm_list(data.get("nogo"))
+    else:
+        out["nogo"] = []
+
+    # language
+    language = str(data.get("language", "nl")).lower()
+    if language not in ("nl", "en"):
+        language = "nl"
+    out["language"] = language
+
+    # optional today-only fields
+    if data["mode"] == "today":
+        if "moment" in data:
+            out["moment"] = str(data["moment"]).lower()
+        if "time" in data:
+            out["time"] = str(data["time"]).lower()
+        if "ambition" in data:
+            try:
+                ambition = int(data["ambition"])
+            except Exception:
+                raise ValueError("ambition must be an integer")
+
+            if ambition < 1 or ambition > 4:
+                raise ValueError("ambition must be between 1 and 4")
+
+            out["ambition"] = ambition
+
+    return out
 # =========================================================
 # Helpers
 # =========================================================
@@ -245,11 +325,12 @@ except ValueError as e:
     st.error(str(e))
     st.stop()
 
+
 # 3) Normalisatie (alleen op gereduceerde input)
 normalized_input = normalize_input(reduced_input)
 
-# 4) Context bouwen (engine ziet NOOIT raw input)
-ctx = build_context(normalized_input)
+# 4) Context doorgeven aan engine (engine is leidend)
+ctx = normalized_input
 
 days = ctx.get("days", 1)
 
