@@ -1,129 +1,145 @@
 # apps/peet_card/app.py
-# Peet-Card — Vandaag (LLM-only)
+# Peet-Card — Vandaag (vrije tekst, variatiegericht)
 
 import sys
 from pathlib import Path
+import time
+import random
+import streamlit as st
 
 # -------------------------------------------------
-# Bootstrap: project-root in sys.path
+# Bootstrap: project-root in sys.path (Cloud + lokaal)
 # -------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import streamlit as st
-from typing import Dict, Any
-import time
-import random
-
-from core.llm import call_peet
+from core.llm import call_peet_text
 
 
-# -------------------------------------------------
-# Helpers
-# -------------------------------------------------
-
-def get_query_params() -> Dict[str, Any]:
-    q = st.query_params
-
-    def _list(key: str):
-        v = q.get(key)
-        if not v:
-            return []
-        return [x.strip() for x in v.split(",") if x.strip()]
-
-    return {
-        "days": int(q.get("days", 1)),
-        "persons": int(q.get("persons", 2)),
-        "moment": q.get("moment", "doordeweeks"),
-        "time": q.get("time", "normaal"),
-        "preference": q.get("preference"),
-        "kitchen": q.get("kitchen"),
-        "vegetarian": q.get("vegetarian") == "true",
-        "allergies": _list("allergies"),
-        "nogo": _list("nogo"),
-        "language": q.get("language", "nl"),
-    }
+def _qp(name: str, default: str = "") -> str:
+    val = st.query_params.get(name, default)
+    if isinstance(val, list):
+        return val[0] if val else default
+    return val if val is not None else default
 
 
-def render_today(result: Dict[str, Any]):
-    st.title("Peet kiest. Jij hoeft alleen te koken.")
-    st.caption("Vandaag geregeld.")
-
-    st.subheader(result["dish_name"])
-    if result.get("why"):
-        st.write(result["why"])
-
-    st.divider()
-    st.button("Download als PDF", disabled=True)
+def _to_int(s: str, default: int) -> int:
+    try:
+        return int(str(s).strip())
+    except Exception:
+        return default
 
 
-def render_forward(result: Dict[str, Any], days: int):
-    st.title(f"Peet plant vooruit · {days} dagen")
-    st.caption("Peet bewaakt balans en variatie.")
-
-    for d in result["days"]:
-        st.subheader(f"Dag {d['day']}")
-        st.write(d["dish_name"])
-        if d.get("why"):
-            st.caption(d["why"])
-        st.divider()
-
-    st.button("Download als PDF", disabled=True)
+def _to_bool(s: str, default: bool = False) -> bool:
+    if s is None or s == "":
+        return default
+    v = str(s).strip().lower()
+    if v in ("1", "true", "yes", "y", "on", "ja"):
+        return True
+    if v in ("0", "false", "no", "n", "off", "nee"):
+        return False
+    return default
 
 
-# -------------------------------------------------
-# Main
-# -------------------------------------------------
+def _to_list(s: str) -> list[str]:
+    if not s:
+        return []
+    return [p.strip().lower() for p in str(s).split(",") if p.strip()]
+
+
+def build_user_context() -> str:
+    """
+    Bouwt een compacte contextstring voor de LLM.
+    Doel: vrijheid + variatie, zonder schema/JSON.
+    """
+
+    days = _to_int(_qp("days", "1"), 1)
+    persons = _to_int(_qp("persons", "2"), 2)
+    persons = max(1, min(12, persons))
+
+    # Vandaag is days=1. Als iemand days>1 meegeeft, blokkeren we (vooruit blijft ongemoeid).
+    if days in (2, 3, 5):
+        return "__FORWARD__"
+
+    moment = _qp("moment", "")
+    time_pref = _qp("time", "")
+    kitchen = _qp("kitchen", "")
+    preference = _qp("preference", "")
+    vegetarian = _to_bool(_qp("vegetarian", ""), False)
+
+    allergies = _to_list(_qp("allergies", ""))
+    nogo = _to_list(_qp("nogo", ""))
+    fridge = _to_list(_qp("fridge", ""))
+
+    # Variatie-injectie: elke run andere richting
+    random.seed(time.time_ns())
+    chef_mood = random.choice([
+        "thuiskoken NL/BE met karakter",
+        "Italiaans comfort maar niet standaard",
+        "mediterraan fris en licht",
+        "Aziatische punch zonder clichés",
+        "Frans bistro, simpel maar raak",
+        "vegetarisch met diepgang (niet salade-achtig)",
+        "visgerecht met spanning (geen standaard citroen-yoghurt)",
+    ])
+    technique = random.choice([
+        "bakken", "roosteren", "stoven", "grillen", "oven", "kort en heet", "langzaam en zacht"
+    ])
+    flavour = random.choice([
+        "fris", "hartig", "romig", "kruidig", "umami", "licht", "diep"
+    ])
+
+    # Nonce: expliciet anders laten zijn per refresh
+    nonce = str(time.time_ns())
+
+    # Compacte context (geen JSON!)
+    lines = []
+    lines.append("CONTEXT (vandaag):")
+    lines.append(f"- persons: {persons}")
+    if moment:
+        lines.append(f"- moment: {moment}")
+    if time_pref:
+        lines.append(f"- time: {time_pref}")
+    if kitchen:
+        lines.append(f"- kitchen (inspiratie): {kitchen}")
+    if preference:
+        lines.append(f"- preference (inspiratie): {preference}")
+    lines.append(f"- vegetarian: {'ja' if vegetarian else 'nee'}")
+    if allergies:
+        lines.append(f"- allergies: {', '.join(allergies)}")
+    if nogo:
+        lines.append(f"- nogo: {', '.join(nogo)}")
+    if fridge:
+        lines.append(f"- fridge: {', '.join(fridge)}")
+
+    lines.append("")
+    lines.append("VRIJE VARIATIE (kies bewust anders dan vorige runs):")
+    lines.append(f"- chef_mood: {chef_mood}")
+    lines.append(f"- technique_hint: {technique}")
+    lines.append(f"- flavour_angle: {flavour}")
+    lines.append(f"- VARIATION_NONCE: {nonce}")
+
+    return "\n".join(lines)
+
 
 def main():
-    ctx = get_query_params()
-    days = ctx["days"]
+    st.set_page_config(page_title="Peet kiest", layout="centered")
 
-    # =========================
-    # VANDAAG → LLM (vrij)
-    # =========================
-    if days == 1:
-        # Bewust BREDE, losse context
-        prompt_context = f"""
-Moment: {ctx['moment']}
-Tijd: {ctx['time']}
-Keukenvoorkeur: {ctx.get('kitchen') or 'vrij'}
-Voorkeur: {ctx.get('preference') or 'geen vaste'}
-Vegetarisch: {'ja' if ctx['vegetarian'] else 'nee'}
-Allergieën: {', '.join(ctx['allergies']) or 'geen'}
+    st.markdown("## Peet kiest. Jij hoeft alleen te koken.")
+    st.caption("Vandaag geregeld. Elke refresh mag echt anders zijn.")
 
-Belangrijk:
-- Kies elke keer iets anders
-- Herhaling is fout
-- Zwerven mag
-- Geen veilige standaardgerechten
-"""
+    user_context = build_user_context()
 
-        result = call_peet(prompt_context)
-        render_today(result)
-        return
+    if user_context == "__FORWARD__":
+        st.warning("Voor 2/3/5 dagen vooruit: gebruik Peet Kiest Vooruit. Peet-Card is vandaag.")
+        st.stop()
 
-    # =========================
-    # VOORUIT → ENGINE
-    # =========================
-    engine_ctx = {
-        "mode": "vooruit",
-        "days": days,
-        "persons": ctx["persons"],
-        "vegetarian": ctx["vegetarian"],
-        "allergies": ctx["allergies"],
-        "nogo": ctx["nogo"],
-        "moment": ctx["moment"],
-        "time": ctx["time"],
-        "language": ctx["language"],
-        # GEEN variation_seed → engine bepaalt rust
-    }
+    with st.spinner("Peet is aan het kiezen…"):
+        text = call_peet_text(user_context)
 
-    result = plan(engine_ctx)
-    render_forward(result, days)
+    st.markdown(text)
 
 
 if __name__ == "__main__":
-    st.set_page_config(page_title="Peet kiest", layout="wide")
     main()
