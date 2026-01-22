@@ -112,7 +112,6 @@ def main():
 
     st.subheader(dish_name)
     if narrative:
-        st.write(narrative)
 
     st.divider()
 
