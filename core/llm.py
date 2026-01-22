@@ -2,7 +2,7 @@
 
 import os
 from openai import OpenAI
-from core.prompts import PROMPT_PEET_KIEST
+from core.prompt import PROMPT_PEET_KIEST
 from core.json_utils import extract_json
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
