@@ -116,3 +116,7 @@ def build_plan_pdf(days: list, days_count: int) -> str:
     doc.build(story)
 
     return path
+def build_plan_pdf(...):
+    ...
+    return path
+
