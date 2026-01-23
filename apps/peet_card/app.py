@@ -151,18 +151,26 @@ def main():
 
     result = plan(engine_context)
 
-    # Zorg dat recipe_text ook in result zit (voor PDF)
-    result["days"][0]["recipe_text"] = recipe_text
+
+    # Bereiding expliciet toevoegen voor UI en PDF
+    result["days"][0]["preparation"] = recipe_text
+
 
     # -----------------------------
     # Bereiding op scherm
     # -----------------------------
     st.subheader("Zo pak je het aan")
 
-    if recipe_text.strip():
-        st.write(recipe_text)
+    prep = result["days"][0].get("preparation", "").strip()
+
+    if prep:
+        steps = [s.strip() for s in prep.split("\n") if s.strip()]
+        for step in steps:
+            st.write(step)
+            st.write("")  # lege regel voor rust
     else:
         st.write("Bereiding niet beschikbaar.")
+
 
     # -----------------------------
     # PDF
