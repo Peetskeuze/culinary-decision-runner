@@ -88,14 +88,14 @@ def build_llm_context() -> str:
     return "\n".join(lines)
 
 
-    # -------------------------------------------------
-    # App
-    # -------------------------------------------------
+# -------------------------------------------------
+# App
+# -------------------------------------------------
 def main():
     st.set_page_config(page_title="Peet kiest", layout="centered")
 
-    st.title("Peet heeft iets uitgekozen. Jij hoeft alleen te koken.")
-    st.caption("Vandaag is het geregeld Ieder dag weer iets nieuws.")
+    st.title("Peet gaat voor je kiezen.")
+    st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
     llm_context = build_llm_context()
 
@@ -103,13 +103,15 @@ def main():
         st.warning("Voor 2/3/5 dagen vooruit: gebruik Peet Kiest Vooruit.")
         st.stop()
 
+    # -------------------------------------------------
     # 1) Peet kiest (LLM)
-    with st.spinner("Peet is aan het kiezen…"):
+    # -------------------------------------------------
+    with st.spinner("We hebben meer dan 1 miljoen gerechten, ik zoek de allerlekkerste voor je..."):
         free_text = call_peet_text(llm_context)
 
-    # -----------------------------
-    # JSON veilig parsen (LLM → app)
-    # -----------------------------
+    # -------------------------------------------------
+    # 2) JSON veilig parsen (LLM → app)
+    # -------------------------------------------------
     dish_name = "Peet kiest iets lekkers"
     recipe_text = ""
     ingredients = []
@@ -117,11 +119,9 @@ def main():
     try:
         data = json.loads(free_text)
 
-        # Gerechtnaam
         if isinstance(data.get("dish_name"), str):
             dish_name = data["dish_name"].strip()
 
-        # Bereiding in stappen
         if isinstance(data.get("recipe_steps"), list):
             recipe_text = "\n\n".join(
                 step.strip()
@@ -129,7 +129,6 @@ def main():
                 if isinstance(step, str) and step.strip()
             )
 
-        # Ingrediëntenlijst (voor PDF)
         if isinstance(data.get("ingredients"), list):
             ingredients = [
                 item.strip()
@@ -138,13 +137,12 @@ def main():
             ]
 
     except Exception:
-        # Bij parsefout: niets forceren
         recipe_text = ""
         ingredients = []
 
-    # -----------------------------
-    # Engine (beslissing & structuur)
-    # -----------------------------
+    # -------------------------------------------------
+    # 3) Engine (beslissing & structuur)
+    # -------------------------------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
     engine_context = {
@@ -157,61 +155,58 @@ def main():
 
     result = plan(engine_context)
 
-    # -------------------------
-    # CENTRALE DATA
-    # -------------------------
+    # -------------------------------------------------
+    # 4) Centrale data
+    # -------------------------------------------------
     days = result.get("days", [])
     days_count = result.get("days_count", len(days))
 
+    if not days:
+        st.error("Geen gerecht gegenereerd.")
+        return
 
+    # Verrijk day[0] expliciet met LLM-output
+    days[0]["dish_name"] = dish_name
+    days[0]["preparation"] = recipe_text
+    days[0]["ingredients"] = ingredients
 
-    # Bereiding en ingrediënten expliciet toevoegen aan result (scherm + PDF)
-
-    result["days"][0]["dish_name"] = dish_name
-    result["days"][0]["preparation"] = recipe_text
-    result["days"][0]["ingredients"] = ingredients
-
-
-    # -----------------------------
-    # Titel gerecht
-    # -----------------------------
+    # -------------------------------------------------
+    # 5) Schermweergave
+    # -------------------------------------------------
     st.subheader(dish_name)
     st.divider()
 
     st.subheader("Zo pak je het aan")
 
-    prep = result["days"][0].get("preparation", "").strip()
+    prep = recipe_text.strip()
 
     if prep:
         steps = [s.strip() for s in prep.split("\n") if s.strip()]
         for step in steps:
             st.write(step)
-            st.write("")  # lege regel voor rust
+            st.write("")  # rust
     else:
         st.write("Bereiding niet beschikbaar.")
 
-    # -----------------------------
-    # PDF
-    # -----------------------------
+    # -------------------------------------------------
+    # 6) PDF
+    # -------------------------------------------------
     from peet_engine.render_pdf import build_plan_pdf
     import os
 
-    pdf_path = "output/Peet_Kiest.pdf"
-
-    build_plan_pdf(
+    pdf_path = build_plan_pdf(
         days=days,
         days_count=days_count,
-        output_path=pdf_path
     )
 
-    if os.path.exists(pdf_path):
+    if pdf_path and os.path.exists(pdf_path):
         with open(pdf_path, "rb") as f:
             st.download_button(
                 label="Download als PDF",
                 data=f,
-                file_name="Peet_Kiest.pdf",
+                file_name=os.path.basename(pdf_path),
                 mime="application/pdf",
-                use_container_width=True
+                use_container_width=True,
             )
 
 
