@@ -503,3 +503,91 @@ def _why_line(
 
     return f"{base} omdat het " + ", ".join(parts) + "."
 
+def build_plan_pdf(result):
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import simpleSplit
+    from datetime import date
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    day = result["days"][0]
+    dish_name = day.get("dish_name", "")
+    preparation = day.get("preparation", "")
+    ingredients = day.get("ingredients", [])
+
+    # ===============================
+    # PAGINA 1 — GERECHT
+    # ===============================
+    y = height - 50
+
+    # Titel
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(40, y, dish_name)
+    y -= 30
+
+    # Ingrediënten
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Ingrediënten")
+    y -= 18
+
+    c.setFont("Helvetica", 10)
+    for item in ingredients:
+        c.drawString(55, y, f"- {item}")
+        y -= 14
+        if y < 100:
+            c.showPage()
+            y = height - 40
+            c.setFont("Helvetica", 10)
+
+    y -= 20
+
+    # Bereiding
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Bereiding")
+    y -= 18
+
+    c.setFont("Helvetica", 10)
+    max_width = width - 95
+    line_height = 13
+
+    steps = [s.strip() for s in preparation.split("\n") if s.strip()]
+
+    for step in steps:
+        lines = simpleSplit(step, "Helvetica", 10, max_width)
+        for line in lines:
+            c.drawString(55, y, line)
+            y -= line_height
+            if y < 100:
+                c.showPage()
+                y = height - 40
+                c.setFont("Helvetica", 10)
+        y -= 10
+
+    # ===============================
+    # PAGINA 2 — BOODSCHAPPENLIJST
+    # ===============================
+    c.showPage()
+    y = height - 50
+
+    c.setFont("Helvetica-Bold", 15)
+    c.drawString(40, y, "Boodschappenlijst")
+    y -= 30
+
+    c.setFont("Helvetica", 10)
+    for item in ingredients:
+        c.drawString(55, y, f"- {item}")
+        y -= 14
+        if y < 100:
+            c.showPage()
+            y = height - 40
+            c.setFont("Helvetica", 10)
+
+    c.save()
+    buffer.seek(0)
+
+    filename = f"Peet_Kiest_{date.today().strftime('%Y%m%d')}.pdf"
+    return buffer, filename

@@ -88,9 +88,9 @@ def build_llm_context() -> str:
     return "\n".join(lines)
 
 
-# -------------------------------------------------
-# App
-# -------------------------------------------------
+    # -------------------------------------------------
+    # App
+    # -------------------------------------------------
 def main():
     st.set_page_config(page_title="Peet kiest", layout="centered")
 
@@ -108,37 +108,43 @@ def main():
         free_text = call_peet_text(llm_context)
 
     # -----------------------------
-    # JSON veilig parsen
+    # JSON veilig parsen (LLM → app)
     # -----------------------------
-    import json
-
     dish_name = "Peet kiest iets lekkers"
     recipe_text = ""
+    ingredients = []
 
     try:
         data = json.loads(free_text)
 
-        dish_name = data.get("dish_name", dish_name)
+        # Gerechtnaam
+        if isinstance(data.get("dish_name"), str):
+            dish_name = data["dish_name"].strip()
 
-        if isinstance(data.get("recipe_text"), str):
-            recipe_text = data["recipe_text"]
-
-        elif isinstance(data.get("recipe_steps"), list):
-            recipe_text = "\n".join(
-                f"Stap {i+1}. {step}" for i, step in enumerate(data["recipe_steps"])
+        # Bereiding in stappen
+        if isinstance(data.get("recipe_steps"), list):
+            recipe_text = "\n\n".join(
+                step.strip()
+                for step in data["recipe_steps"]
+                if isinstance(step, str) and step.strip()
             )
 
-        else:
-            recipe_text = free_text
+        # Ingrediëntenlijst (voor PDF)
+        if isinstance(data.get("ingredients"), list):
+            ingredients = [
+                item.strip()
+                for item in data["ingredients"]
+                if isinstance(item, str) and item.strip()
+            ]
 
     except Exception:
-        recipe_text = free_text
+        # Bij parsefout: niets forceren
+        recipe_text = ""
+        ingredients = []
 
-    # Toon titel
-    st.subheader(dish_name)
-    st.divider()
-
-    # 2) Engine (structuur + PDF)
+    # -----------------------------
+    # Engine (beslissing & structuur)
+    # -----------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
     engine_context = {
@@ -151,9 +157,9 @@ def main():
 
     result = plan(engine_context)
 
-
-    # Bereiding expliciet toevoegen voor UI en PDF
+    # Bereiding en ingrediënten expliciet toevoegen aan result (scherm + PDF)
     result["days"][0]["preparation"] = recipe_text
+    result["days"][0]["ingredients"] = ingredients
 
 
     # -----------------------------
