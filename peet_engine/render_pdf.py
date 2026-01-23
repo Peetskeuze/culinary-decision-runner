@@ -1,22 +1,13 @@
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, PageBreak, ListFlowable, ListItem
+    SimpleDocTemplate, Paragraph, Spacer
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
-from datetime import date
 import os
 
 
 def build_plan_pdf(days: list, days_count: int) -> str:
-    """
-    Bouwt een keukenproof PDF voor 1 dag.
-    Verwacht:
-      days[0]["dish_name"]
-      days[0]["preparation"]  -> string met \n
-      days[0]["ingredients"]  -> lijst strings
-    """
-
     if not days:
         return ""
 
@@ -74,6 +65,16 @@ def build_plan_pdf(days: list, days_count: int) -> str:
     # Titel
     story.append(Paragraph(dish_name, styles["DishTitle"]))
 
+    # Ingrediënten
+    story.append(Paragraph("Ingrediënten", styles["Section"]))
+
+    if ingredients:
+        for item in ingredients:
+            if isinstance(item, str) and item.strip():
+                story.append(Paragraph(f"• {item.strip()}", styles["Body"]))
+    else:
+        story.append(Paragraph("Geen ingrediënten beschikbaar.", styles["Body"]))
+
     # Bereiding
     story.append(Paragraph("Zo pak je het aan", styles["Section"]))
 
@@ -85,38 +86,5 @@ def build_plan_pdf(days: list, days_count: int) -> str:
     else:
         story.append(Paragraph("Bereiding niet beschikbaar.", styles["Body"]))
 
-    # Nieuwe pagina voor boodschappen
-    story.append(PageBreak())
-
-    # Boodschappenlijst
-    story.append(Paragraph("Boodschappenlijst", styles["Section"]))
-
-    if ingredients:
-        items = []
-        for item in ingredients:
-            if isinstance(item, str) and item.strip():
-                items.append(
-                    ListItem(
-                        Paragraph(item.strip(), styles["Body"]),
-                        leftIndent=12
-                    )
-                )
-
-        story.append(
-            ListFlowable(
-                items,
-                bulletType="bullet",
-                start="bullet",
-                leftIndent=0
-            )
-        )
-    else:
-        story.append(Paragraph("Geen ingrediënten beschikbaar.", styles["Body"]))
-
     doc.build(story)
-
     return path
-def build_plan_pdf(...):
-    ...
-    return path
-

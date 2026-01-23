@@ -170,21 +170,34 @@ def main():
     days[0]["preparation"] = recipe_text
     days[0]["ingredients"] = ingredients
 
-    # -------------------------------------------------
-    # 5) Schermweergave
-    # -------------------------------------------------
+    # -----------------------------
+    # Schermweergave
+    # -----------------------------
     st.subheader(dish_name)
     st.divider()
 
+    # Ingrediënten
+    st.subheader("Ingrediënten")
+
+    ingredients = days[0].get("ingredients", [])
+    if ingredients:
+        for item in ingredients:
+            st.write(f"• {item}")
+    else:
+        st.write("Geen ingrediënten beschikbaar.")
+
+    st.divider()
+
+    # Bereiding
     st.subheader("Zo pak je het aan")
 
-    prep = recipe_text.strip()
+    prep = days[0].get("preparation", "").strip()
 
     if prep:
         steps = [s.strip() for s in prep.split("\n") if s.strip()]
         for step in steps:
             st.write(step)
-            st.write("")  # rust
+            st.write("")  # witregel voor rust
     else:
         st.write("Bereiding niet beschikbaar.")
 
