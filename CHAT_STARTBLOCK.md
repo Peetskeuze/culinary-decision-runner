@@ -72,7 +72,7 @@ PDF-generatie en een eenvoudige Carrd → Streamlit gebruikersflow.
 ---
 
 ## STATUS & WERKWIJZE
-- Er wordt altijd gewerkt vanuit een expliciet benoemd **BAKEN**
+- Er wordt altijd gewerkt vanuit een expliciet benoemd Peet Kiest – App draait, maar output onvolledig (stand 22-01)
 - Zonder baken geen inhoudelijke wijziging
 
 ---
@@ -88,5 +88,5 @@ PDF-generatie en een eenvoudige Carrd → Streamlit gebruikersflow.
 ---
 
 ## STARTINSTRUCTIE
-Pak baken: **[NAAM VAN HET BAKEN]**  
+Pak baken: Peet Kiest – App draait, maar output onvolledig (stand 22-01)
 Werk vanaf daar verder. Geen zijpaden.

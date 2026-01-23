@@ -34,8 +34,17 @@ Je geeft exact deze JSON-structuur terug:
 
 {
   "dish_name": "",
-  "recipe_steps": []
+  "recipe_steps": [],
+  "ingredients": []
 }
+
+INGREDIËNTEN — VERPLICHT
+- Geef een lijst met ingrediënten die nodig zijn voor het gerecht.
+- Gebruik begrijpelijke hoeveelheden.
+- Schrijf zoals op een boodschappenlijst.
+- Geen uitleg, geen bereidingstekst.
+- Elk item is één string.
+
 
 REGELS:
 - dish_name is de volledige naam van het gerecht.

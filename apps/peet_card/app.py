@@ -94,8 +94,8 @@ def build_llm_context() -> str:
 def main():
     st.set_page_config(page_title="Peet kiest", layout="centered")
 
-    st.title("Peet kiest. Jij hoeft alleen te koken.")
-    st.caption("Vandaag geregeld. Elke refresh mag echt anders zijn.")
+    st.title("Peet heeft iets uitgekozen. Jij hoeft alleen te koken.")
+    st.caption("Vandaag is het geregeld Ieder dag weer iets nieuws.")
 
     llm_context = build_llm_context()
 
@@ -157,14 +157,27 @@ def main():
 
     result = plan(engine_context)
 
+    # -------------------------
+    # CENTRALE DATA
+    # -------------------------
+    days = result.get("days", [])
+    days_count = result.get("days_count", len(days))
+
+
+
     # Bereiding en ingrediënten expliciet toevoegen aan result (scherm + PDF)
+
+    result["days"][0]["dish_name"] = dish_name
     result["days"][0]["preparation"] = recipe_text
     result["days"][0]["ingredients"] = ingredients
 
 
     # -----------------------------
-    # Bereiding op scherm
+    # Titel gerecht
     # -----------------------------
+    st.subheader(dish_name)
+    st.divider()
+
     st.subheader("Zo pak je het aan")
 
     prep = result["days"][0].get("preparation", "").strip()
@@ -177,18 +190,29 @@ def main():
     else:
         st.write("Bereiding niet beschikbaar.")
 
-
     # -----------------------------
     # PDF
     # -----------------------------
-    pdf_buffer, filename = build_plan_pdf(result)
+    from peet_engine.render_pdf import build_plan_pdf
+    import os
 
-    st.download_button(
-        label="Download als PDF",
-        data=pdf_buffer.getvalue(),
-        file_name=filename,
-        mime="application/pdf"
+    pdf_path = "output/Peet_Kiest.pdf"
+
+    build_plan_pdf(
+        days=days,
+        days_count=days_count,
+        output_path=pdf_path
     )
+
+    if os.path.exists(pdf_path):
+        with open(pdf_path, "rb") as f:
+            st.download_button(
+                label="Download als PDF",
+                data=f,
+                file_name="Peet_Kiest.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
 
 
 if __name__ == "__main__":

@@ -124,3 +124,4 @@ Voorbeeld:
 - Nieuwe ideeën = nieuw baken
 - Bugs fixen binnen een baken mag
 - Architectuur wijzigen = altijd nieuw baken
+
