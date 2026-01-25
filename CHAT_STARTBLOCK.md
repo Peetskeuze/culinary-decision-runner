@@ -88,5 +88,25 @@ PDF-generatie en een eenvoudige Carrd → Streamlit gebruikersflow.
 ---
 
 ## STARTINSTRUCTIE
-Pak baken: Peet Kiest – App draait, maar output onvolledig (stand 22-01)
-Werk vanaf daar verder. Geen zijpaden.
+Pak baken: Baken gezet.
+
+Naam baken:
+Peet Kiest – 1-dag recept compleet (ingrediënten + bereiding op scherm én PDF)
+
+Wat dit baken vastlegt:
+
+1-dag flow is leidend en stabiel
+
+Ingrediëntenlijst zichtbaar op scherm én in PDF
+
+Bereiding in rustige stappen (“Peet kijkt over je schouder”)
+
+Geen aparte boodschappenlijst
+
+PDF = 1 pagina, keukenproof, naam = gerecht
+
+Carrd-input vereenvoudigd (altijd 1 dag)
+
+Architectuur schoon: engine → app → PDF
+
+Vanaf hier kunnen we altijd veilig hervatten zonder opnieuw te zoeken.

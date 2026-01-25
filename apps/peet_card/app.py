@@ -6,9 +6,9 @@
 
 import sys
 from pathlib import Path
-import streamlit as st
 import json
-
+import time
+import streamlit as st
 
 # -------------------------------------------------
 # Bootstrap: project-root in sys.path (lokaal + cloud)
@@ -24,6 +24,26 @@ from core.llm import call_peet_text
 from peet_engine.engine import plan
 from peet_engine.render_pdf import build_plan_pdf
 
+# -------------------------------------------------
+# LLM call met cache (voorkomt dubbele calls)
+# -------------------------------------------------
+@st.cache_data(show_spinner=False)
+def get_peet_choice(context: str):
+    return call_peet_text(context)
+
+
+# -------------------------------------------------
+# Rate guard (simpele bescherming)
+# -------------------------------------------------
+def rate_guard(min_seconds=10):
+    now = time.time()
+    last = st.session_state.get("last_call", 0)
+
+    if now - last < min_seconds:
+        st.warning("Peet is net bezig geweest. Even rustig aan 🙂")
+        st.stop()
+
+    st.session_state["last_call"] = now
 
 # -------------------------------------------------
 # Helpers
@@ -106,6 +126,8 @@ def main():
     # -------------------------------------------------
     # 1) Peet kiest (LLM)
     # -------------------------------------------------
+    rate_guard(10)
+
     with st.spinner("We hebben meer dan 1 miljoen gerechten, ik zoek de allerlekkerste voor je..."):
         free_text = call_peet_text(llm_context)
 
