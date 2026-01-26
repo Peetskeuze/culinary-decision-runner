@@ -9,6 +9,9 @@ from pathlib import Path
 import json
 import time
 import streamlit as st
+import time
+import hashlib
+
 
 # -------------------------------------------------
 # Bootstrap: project-root in sys.path (lokaal + cloud)
@@ -28,8 +31,9 @@ from peet_engine.render_pdf import build_plan_pdf
 # LLM call met cache (voorkomt dubbele calls)
 # -------------------------------------------------
 @st.cache_data(show_spinner=False)
-def get_peet_choice(context: str):
-    return call_peet_text(context)
+def get_peet_choice_cached(context_hash: str, context_text: str):
+    return call_peet_text(context_text)
+
 
 
 # -------------------------------------------------
@@ -112,6 +116,8 @@ def build_llm_context() -> str:
 # App
 # -------------------------------------------------
 def main():
+    st.session_state.pop("peet_result", None)
+
     st.set_page_config(page_title="Peet kiest", layout="centered")
 
     st.title("Peet gaat voor je kiezen.")
@@ -124,12 +130,20 @@ def main():
         st.stop()
 
     # -------------------------------------------------
-    # 1) Peet kiest (LLM)
+    # LLM – Peet kiest (met veilige caching)
     # -------------------------------------------------
-    rate_guard(10)
 
-    with st.spinner("We hebben meer dan 1 miljoen gerechten, ik zoek de allerlekkerste voor je..."):
-        free_text = call_peet_text(llm_context)
+    @st.cache_data(show_spinner=False)
+    def fetch_peet_choice(context: str):
+        return call_peet_text(context)
+
+
+    # Forceer nieuwe keuze per page load
+    if "peet_result" not in st.session_state:
+        with st.spinner("We hebben meer dan 1 miljoen recepten en Peet zoek de allerlekkerste voor je op dit moment"):
+            st.session_state["peet_result"] = fetch_peet_choice(llm_context)
+
+    free_text = st.session_state["peet_result"]
 
     # -------------------------------------------------
     # 2) JSON veilig parsen (LLM → app)
@@ -226,13 +240,15 @@ def main():
     # -------------------------------------------------
     # 6) PDF
     # -------------------------------------------------
-    from peet_engine.render_pdf import build_plan_pdf
     import os
 
-    pdf_path = build_plan_pdf(
-        days=days,
-        days_count=days_count,
-    )
+    if "pdf_path" not in st.session_state:
+        st.session_state["pdf_path"] = build_plan_pdf(
+            days=days,
+            days_count=days_count,
+        )
+
+    pdf_path = st.session_state["pdf_path"]
 
     if pdf_path and os.path.exists(pdf_path):
         with open(pdf_path, "rb") as f:
