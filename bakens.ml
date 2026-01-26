@@ -124,4 +124,11 @@ Voorbeeld:
 - Nieuwe ideeën = nieuw baken
 - Bugs fixen binnen een baken mag
 - Architectuur wijzigen = altijd nieuw baken
+2026-01-26 – Carrd Form Mobile Layout & Typography stabiel
+
+- Form past exact op één mobiel scherm
+- Uitlijning links strak en consistent
+- Witruimte gelijkgetrokken via Container Mobile padding
+- Tekst opgeschaald via Form Fields Mobile size (±1.2)
+- Rustige app-achtige look bereikt
 
