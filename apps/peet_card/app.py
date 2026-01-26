@@ -217,10 +217,11 @@ def main():
 
     ingredients = days[0].get("ingredients", [])
     if ingredients:
-        for item in ingredients:
-            st.write(f"• {item}")
+        ingred_text = "\n".join(f"- {item}" for item in ingredients)
+        st.markdown(ingred_text)
     else:
         st.write("Geen ingrediënten beschikbaar.")
+
 
     st.divider()
 
