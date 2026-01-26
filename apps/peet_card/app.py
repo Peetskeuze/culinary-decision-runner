@@ -145,7 +145,23 @@ def build_llm_context() -> str:
 def main():
     st.session_state.pop("peet_result", None)
 
-    st.set_page_config(page_title="Peet kiest", layout="centered")
+    st.set_page_config(
+        page_title="Peet kiest",
+        layout="centered",
+        initial_sidebar_state="collapsed",
+        menu_items={}
+    )
+
+    st.markdown(
+        """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.title("Peet gaat voor je kiezen.")
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
