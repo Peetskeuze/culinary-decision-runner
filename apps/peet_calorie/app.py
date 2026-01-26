@@ -182,6 +182,7 @@ if st.button("Peet, kies voor mij"):
 
     with st.spinner("Peet denkt even na..."):
         try:
+            from core.llm import call_peet   # expliciet opnieuw laden
             result = call_peet(context)
         except Exception as e:
             st.error("Peet raakte even de draad kwijt.")
