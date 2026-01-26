@@ -155,13 +155,34 @@ def main():
     st.markdown(
         """
         <style>
+        /* Verberg Streamlit standaard UI */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
+
+        /* Verberg floating mobile buttons (share/fork) */
+        div[data-testid="stToolbar"] {
+            display: none !important;
+        }
+
+        div[data-testid="stDecoration"] {
+            display: none !important;
+        }
+
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+
+        /* Soms heten ze net anders op mobiel */
+        .st-emotion-cache-1dp5vir,
+        .st-emotion-cache-1avcm0n {
+            display: none !important;
+        }
         </style>
         """,
         unsafe_allow_html=True
     )
+
 
     st.title("Peet gaat voor je kiezen.")
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
