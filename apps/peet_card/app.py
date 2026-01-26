@@ -213,7 +213,7 @@ def main():
     st.divider()
 
     # Ingrediënten
-    st.subheader("Ingrediënten")
+    st.subheader(f"Ingrediënten (voor {persons} personen)")
 
     ingredients = days[0].get("ingredients", [])
     if ingredients:
