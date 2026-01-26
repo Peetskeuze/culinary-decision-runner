@@ -152,45 +152,6 @@ def main():
         menu_items={}
     )
 
-    st.markdown(
-        """
-        <style>
-        /* Basis Streamlit UI weg */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-
-        /* Toolbar & status */
-        div[data-testid="stToolbar"],
-        div[data-testid="stDecoration"],
-        div[data-testid="stStatusWidget"] {
-            display: none !important;
-        }
-
-        /* Floating mobile buttons (agressief) */
-        iframe {
-            display: none !important;
-        }
-
-        /* Bekende mobile overlays */
-        [class*="floating"],
-        [class*="toolbar"],
-        [class*="overlay"],
-        [class*="fab"],
-        [class*="st-emotion-cache"] {
-            display: none !important;
-        }
-
-        /* Alles fixed rechtsonder killen */
-        div[style*="position: fixed"][style*="bottom"] {
-            display: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-
     st.title("Peet gaat voor je kiezen.")
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
