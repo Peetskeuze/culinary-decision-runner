@@ -155,27 +155,34 @@ def main():
     st.markdown(
         """
         <style>
-        /* Verberg Streamlit standaard UI */
+        /* Basis Streamlit UI weg */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        /* Verberg floating mobile buttons (share/fork) */
-        div[data-testid="stToolbar"] {
-            display: none !important;
-        }
-
-        div[data-testid="stDecoration"] {
-            display: none !important;
-        }
-
+        /* Toolbar & status */
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
         div[data-testid="stStatusWidget"] {
             display: none !important;
         }
 
-        /* Soms heten ze net anders op mobiel */
-        .st-emotion-cache-1dp5vir,
-        .st-emotion-cache-1avcm0n {
+        /* Floating mobile buttons (agressief) */
+        iframe {
+            display: none !important;
+        }
+
+        /* Bekende mobile overlays */
+        [class*="floating"],
+        [class*="toolbar"],
+        [class*="overlay"],
+        [class*="fab"],
+        [class*="st-emotion-cache"] {
+            display: none !important;
+        }
+
+        /* Alles fixed rechtsonder killen */
+        div[style*="position: fixed"][style*="bottom"] {
             display: none !important;
         }
         </style>
