@@ -9,6 +9,33 @@ from pathlib import Path
 import json
 import time
 import streamlit as st
+
+# -----------------------------
+# Font gelijk aan Carrd (Roboto Condensed)
+# -----------------------------
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Roboto Condensed', sans-serif;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Roboto Condensed', sans-serif;
+        font-weight: 700;
+    }
+
+    p, div, span, label {
+        font-family: 'Roboto Condensed', sans-serif;
+        font-weight: 400;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 import time
 import hashlib
 
