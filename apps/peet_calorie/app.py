@@ -11,14 +11,17 @@ from reportlab.lib.units import cm
 
 
 # -------------------------------------------------
-# Project root fix voor Streamlit Cloud
+# Project root fix (Streamlit Cloud correct)
 # -------------------------------------------------
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]   # <-- BELANGRIJK
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core.llm import call_peet
+from core.llm import call_peet_text
+import json
+
+
 
 
 # -------------------------------------------------
@@ -40,11 +43,12 @@ def build_pdf(result: dict) -> BytesIO:
     styles = getSampleStyleSheet()
     story = []
 
-    # Titel
-    story.append(Paragraph(result.get("title", ""), styles["Title"]))
+    # Titel gerecht
+    title = result.get("dish_name") or result.get("title", "")
+    story.append(Paragraph(title, styles["Title"]))
     story.append(Spacer(1, 12))
 
-    # Calorie-duiding
+    # Calorie-duiding (optioneel)
     cd = result.get("calorie_duiding")
     if cd:
         story.append(
@@ -75,13 +79,22 @@ def build_pdf(result: dict) -> BytesIO:
 
     story.append(Spacer(1, 16))
 
-    # Bereiding
+    # Bereiding (nieuwe engine-structuur)
     story.append(Paragraph("Bereiding", styles["Heading2"]))
 
-    for step in result.get("steps", []):
+    steps = (
+        result.get("recipe_steps")
+        or result.get("preparation")
+        or result.get("bereiding")
+        or result.get("steps")
+        or []
+    )
+
+    for step in steps:
         story.append(Paragraph(step, styles["BodyText"]))
         story.append(Spacer(1, 6))
 
+    # PDF bouwen
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
@@ -97,19 +110,25 @@ def build_pdf(result: dict) -> BytesIO:
     return buf
 
 
+
 # -------------------------------------------------
-# Streamlit pagina
+# Streamlit UI
 # -------------------------------------------------
 
 st.set_page_config(page_title="Peet Calorie")
+
+# Session state init
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
+
 
 st.title("Peet Calorie")
 st.caption("Kiezen op calorieën – met gezond verstand")
 
 
-# -------------------------------------------------
+# -------------------------
 # Invoer
-# -------------------------------------------------
+# -------------------------
 
 moment = st.radio(
     "Wanneer eet je dit?",
@@ -131,15 +150,28 @@ ingredient_hint = st.text_input(
 )
 
 
-# -------------------------------------------------
+# -------------------------
 # Actie
-# -------------------------------------------------
-
+# -------------------------
 if st.button("Peet, kies voor mij"):
 
     context = f"""
 Moment: {moment}
 Max calorieën: {max_cal}
+
+PORTIES & CALORIE-AFSTEMMING
+
+Alle gerechten zijn altijd voor 1 persoon.
+
+Gebruik realistische porties per persoon:
+- Vlees, vis of vega eiwitbron: 120–160 g
+- Aardappelen: 180–220 g
+- Rijst, pasta of granen (droog): 60–80 g
+- Groenten: 200–250 g
+- Sauzen en vetten zuinig gebruiken
+
+Stem de hoeveelheden zo af dat het gerecht zo dicht mogelijk bij de opgegeven caloriegrens blijft,
+zonder deze duidelijk te overschrijden.
 """
 
     if ingredient_hint.strip():
@@ -155,24 +187,27 @@ Kies één gerecht dat logisch past bij dit moment.
 """
 
     with st.spinner("Peet denkt even na..."):
-
         try:
-            result = call_peet(context)
+            raw_response = call_peet_text(context)
+            st.session_state.last_result = json.loads(raw_response)
         except Exception as e:
             st.error("Peet raakte even de draad kwijt.")
             st.write(e)
             st.stop()
 
+# -------------------------
+# Resultaat tonen
+# -------------------------
 
-    # -------------------------------------------------
-    # Resultaat tonen
-    # -------------------------------------------------
+if st.session_state.last_result:
 
-    if "title" in result:
-        st.header(result["title"])
+    result = st.session_state.last_result
 
-        if "meal_type" in result:
-            st.caption(result["meal_type"])
+
+    # Gerechtnaam
+    dish_name = result.get("dish_name") or result.get("title")
+    if dish_name:
+        st.header(dish_name)
 
 
     # Calorie-duiding
@@ -201,19 +236,23 @@ Kies één gerecht dat logisch past bij dit moment.
     # Bereiding
     st.subheader("Bereiding")
 
-    for step in result.get("steps", []):
+    steps = (
+        result.get("recipe_steps")
+        or result.get("preparation")
+        or result.get("steps")
+        or []
+    )
+
+    for step in steps:
         st.markdown(f"- {step}")
 
 
     st.divider()
 
 
-    # -------------------------------------------------
     # PDF download
-    # -------------------------------------------------
-
     pdf_buffer = build_pdf(result)
-    filename = safe_filename(result.get("title"))
+    filename = safe_filename(result.get("dish_name"))
 
     st.download_button(
         label="Download boodschappenlijst + bereiding (PDF)",
