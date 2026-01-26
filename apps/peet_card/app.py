@@ -233,7 +233,6 @@ def main():
         steps = [s.strip() for s in prep.split("\n") if s.strip()]
         for step in steps:
             st.write(step)
-            st.write("")  # witregel voor rust
     else:
         st.write("Bereiding niet beschikbaar.")
 
