@@ -126,13 +126,13 @@ def build_pdf(result: dict) -> BytesIO:
     buf.seek(0)
     return buf
 
+    # --- project root for Streamlit Cloud ---
+    ROOT = Path(__file__).resolve().parents[1]
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
 
-# --- project root for Streamlit Cloud ---
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+    from core.llm import call_peet
 
-from core.llm import call_peet
 
 
 # --- pagina ---
