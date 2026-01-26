@@ -127,11 +127,13 @@ def build_pdf(result: dict) -> BytesIO:
     return buf
 
 
-# --- core beschikbaar maken ---
+# --- project root for Streamlit Cloud ---
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.append(str(ROOT))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from core.llm import call_peet
+
 
 # --- pagina ---
 st.set_page_config(page_title="Peet Calorie")
