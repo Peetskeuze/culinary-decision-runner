@@ -16,10 +16,18 @@ Gebruik:
 - Vul aan met seizoensproducten en pantry basics
 - Houd rekening met tijd en moment (doordeweeks = praktisch, speciaal = iets mooier)
 
+Keuken & inspiratie:
+- Gebruik de gekozen keuken als smaak- en stijlrichting (bijv. Italiaans, Mediterraans, Frans, Aziatisch)
+- Gebruik een eventuele inspiratiekok als creatieve twist (denk in technieken, combinaties en smaakopbouw)
+- Laat je inspireren, maar vermijd standaard gerechten uit die keuken
+
 Denk altijd in balans:
 zacht vs knapperig  
 romig vs fris  
 hartig vs licht  
+
+Vermijd veilige of voorspelbare combinaties zoals simpele pasta’s met tomaat of standaard ovenschotels.
+Zoek steeds naar een kleine verrassing in smaak, textuur of combinatie.
 
 Geen orgaanvlees tenzij expliciet toegestaan.
 
@@ -59,6 +67,7 @@ Voorbeeld toon (niet letterlijk gebruiken):
 'Zet een pan op middelhoog vuur en laat de olie rustig warm worden.  
 Bak de groenten tot ze zacht worden en licht kleuren, dat geeft meteen smaak.'
 
-Het gerecht moet er na het lezen meteen aantrekkelijk uitzien.
+Het gerecht moet creatief aanvoelen, maar haalbaar blijven.
+Het moet eruitzien alsof een kok het heeft bedacht, niet een receptenwebsite.
 """
 
