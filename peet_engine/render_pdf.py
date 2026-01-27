@@ -14,8 +14,26 @@ def build_plan_pdf(days: list, days_count: int) -> str:
     day = days[0]
 
     dish_name = day.get("dish_name", "Peet kiest iets lekkers")
-    preparation = day.get("preparation", "")
+
+    # FAST kan preparation als list geven; classic vaak als string met \n
+    preparation_raw = day.get("preparation", "")
+    if isinstance(preparation_raw, list):
+        steps = [s.strip() for s in preparation_raw if isinstance(s, str) and s.strip()]
+    elif isinstance(preparation_raw, str):
+        steps = [s.strip() for s in preparation_raw.split("\n") if s.strip()]
+    else:
+        steps = []
+
     ingredients = day.get("ingredients", [])
+    if not isinstance(ingredients, list):
+        ingredients = []
+
+    why = day.get("why", "")
+    if not isinstance(why, str):
+        why = ""
+
+    persons = day.get("persons", "")
+    persons_label = f" (voor {persons} personen)" if persons else ""
 
     # Bestandsnaam = gerecht
     safe_name = "".join(c for c in dish_name if c.isalnum() or c in " -_").rstrip()
@@ -36,19 +54,27 @@ def build_plan_pdf(days: list, days_count: int) -> str:
 
     styles = getSampleStyleSheet()
 
+    # Titels wat strakker en rustiger
     styles.add(ParagraphStyle(
         name="DishTitle",
         fontSize=18,
         leading=22,
-        spaceAfter=16,
+        spaceAfter=10,
         fontName="Helvetica-Bold"
+    ))
+
+    styles.add(ParagraphStyle(
+        name="Why",
+        fontSize=10.5,
+        leading=15,
+        spaceAfter=10
     ))
 
     styles.add(ParagraphStyle(
         name="Section",
         fontSize=13,
         leading=16,
-        spaceBefore=18,
+        spaceBefore=14,
         spaceAfter=8,
         fontName="Helvetica-Bold"
     ))
@@ -57,7 +83,7 @@ def build_plan_pdf(days: list, days_count: int) -> str:
         name="Body",
         fontSize=10.5,
         leading=15,
-        spaceAfter=6
+        spaceAfter=4
     ))
 
     story = []
@@ -65,8 +91,12 @@ def build_plan_pdf(days: list, days_count: int) -> str:
     # Titel
     story.append(Paragraph(dish_name, styles["DishTitle"]))
 
+    # Why (Peet-zin)
+    if why.strip():
+        story.append(Paragraph(why.strip(), styles["Why"]))
+
     # Ingrediënten
-    story.append(Paragraph("Ingrediënten", styles["Section"]))
+    story.append(Paragraph(f"Ingrediënten{persons_label}", styles["Section"]))
 
     if ingredients:
         for item in ingredients:
@@ -76,13 +106,13 @@ def build_plan_pdf(days: list, days_count: int) -> str:
         story.append(Paragraph("Geen ingrediënten beschikbaar.", styles["Body"]))
 
     # Bereiding
-    story.append(Paragraph("Zo pak je het aan", styles["Section"]))
+    story.append(Paragraph("Zo pakken we het aan", styles["Section"]))
 
-    if preparation:
-        steps = [s.strip() for s in preparation.split("\n") if s.strip()]
+    if steps:
+        nr = 1
         for step in steps:
-            story.append(Paragraph(step, styles["Body"]))
-            story.append(Spacer(1, 4))
+            story.append(Paragraph(f"{nr}. {step}", styles["Body"]))
+            nr += 1
     else:
         story.append(Paragraph("Bereiding niet beschikbaar.", styles["Body"]))
 

@@ -51,16 +51,12 @@ if str(ROOT) not in sys.path:
 # Imports
 # -------------------------------------------------
 from core.llm import call_peet_text
+from core.fast_test.llm_fast import fetch_peet_choice_fast
+from context_builder import build_context
 from peet_engine.engine import plan
 from peet_engine.render_pdf import build_plan_pdf
 
-# -------------------------------------------------
-# LLM call met cache (voorkomt dubbele calls)
-# -------------------------------------------------
-@st.cache_data(show_spinner=False)
-def get_peet_choice_cached(context_hash: str, context_text: str):
-    return call_peet_text(context_text)
-
+USE_FAST = True
 
 
 # -------------------------------------------------
@@ -144,6 +140,8 @@ def build_llm_context() -> str:
 # -------------------------------------------------
 def main():
     st.session_state.pop("peet_result", None)
+    st.session_state.pop("pdf_path", None)
+
 
     st.set_page_config(
         page_title="Peet kiest",
@@ -155,73 +153,86 @@ def main():
     st.title("Peet gaat voor je kiezen.")
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
-    llm_context = build_llm_context()
+    # -------------------------------------------------
+    # Raw context opbouwen uit query params (voor fast flow)
+    # -------------------------------------------------
+
+    raw_context = {
+        "persons": max(1, min(12, to_int(qp("persons", "2"), 2))),
+        "time": qp("time", ""),
+        "moment": qp("moment", ""),
+        "preference": qp("preference", ""),
+        "kitchen": qp("kitchen", ""),
+        "fridge": qp("fridge", ""),
+        "nogo": qp("nogo", ""),
+        "allergies": qp("allergies", ""),
+    }
+
+    llm_context = build_context(raw_context)
 
     if llm_context == "__FORWARD__":
         st.warning("Voor 2/3/5 dagen vooruit: gebruik Peet Kiest Vooruit.")
         st.stop()
 
     # -------------------------------------------------
-    # LLM – Peet kiest (met veilige caching)
+    # LLM – Peet kiest (FAST + fallback)
     # -------------------------------------------------
 
     @st.cache_data(show_spinner=False)
-    def fetch_peet_choice(context: str):
+    def fetch_peet_choice(context: dict):
+        if USE_FAST:
+            return fetch_peet_choice_fast(context)
         return call_peet_text(context)
-
 
     # Forceer nieuwe keuze per page load
     if "peet_result" not in st.session_state:
-        with st.spinner("We hebben meer dan 1 miljoen recepten en Peet zoek de allerlekkerste voor je op dit moment"):
+        with st.spinner("We hebben meer dan 1 miljoen recepten en Peet zoekt de allerlekkerste voor je uit..."):
             st.session_state["peet_result"] = fetch_peet_choice(llm_context)
 
-    free_text = st.session_state["peet_result"]
+    free_text = st.session_state.get("peet_result", {})
+
+    # ------------------------------
+    # Render (FAST)
+    # ------------------------------
+    if not isinstance(free_text, dict) or not free_text:
+        st.error("Peet kreeg geen geldig resultaat terug. Refresh even.")
+        st.stop()
+
+    dish_name = free_text.get("dish_name", "Peet kiest iets lekkers")
+    why = free_text.get("why", "")
+    ingredients = free_text.get("ingredients", [])
+    recipe_steps = free_text.get("preparation", [])
+
+    st.subheader(dish_name)
+    if isinstance(why, str) and why.strip():
+        st.caption(why.strip())
+
+    persons_label = llm_context.get("persons", "")
+    st.markdown("---")
+
+    st.markdown(f"### Ingrediënten (voor {persons_label} personen)")
+    if isinstance(ingredients, list) and ingredients:
+        for item in ingredients:
+            if isinstance(item, str) and item.strip():
+                st.write(f"• {item.strip()}")
+    else:
+        st.write("Geen ingrediënten beschikbaar.")
+
+    st.markdown("---")
+
+    st.markdown("### Zo pak je het aan")
+    if isinstance(recipe_steps, list) and recipe_steps:
+        for step in recipe_steps:
+            if isinstance(step, str) and step.strip():
+                st.write(step.strip())
+    else:
+        st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # 2) JSON veilig parsen (LLM → app)
+    # Fast flow is leidend – oude engine niet meer uitvoeren
     # -------------------------------------------------
-    dish_name = "Peet kiest iets lekkers"
-    recipe_text = ""
-    ingredients = []
+    return
 
-    try:
-        data = json.loads(free_text)
-
-        if isinstance(data.get("dish_name"), str):
-            dish_name = data["dish_name"].strip()
-
-        if isinstance(data.get("recipe_steps"), list):
-            recipe_text = "\n\n".join(
-                step.strip()
-                for step in data["recipe_steps"]
-                if isinstance(step, str) and step.strip()
-            )
-
-        if isinstance(data.get("ingredients"), list):
-            ingredients = [
-                item.strip()
-                for item in data["ingredients"]
-                if isinstance(item, str) and item.strip()
-            ]
-
-    except Exception:
-        recipe_text = ""
-        ingredients = []
-
-    # -------------------------------------------------
-    # 3) Engine (beslissing & structuur)
-    # -------------------------------------------------
-    persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
-
-    engine_context = {
-        "days": 1,
-        "persons": persons,
-        "dish_name": dish_name,
-        "allergies": to_list(qp("allergies", "")),
-        "nogo": to_list(qp("nogo", "")),
-    }
-
-    result = plan(engine_context)
 
     # -------------------------------------------------
     # 4) Centrale data
@@ -235,7 +246,7 @@ def main():
 
     # Verrijk day[0] expliciet met LLM-output
     days[0]["dish_name"] = dish_name
-    days[0]["preparation"] = recipe_text
+    days[0]["preparation"] = "\n".join(recipe_steps)
     days[0]["ingredients"] = ingredients
 
     # -----------------------------
@@ -270,10 +281,26 @@ def main():
         st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # 6) PDF
+    # 6) PDF (FAST output = PDF output)
     # -------------------------------------------------
     import os
 
+    # Zorg dat days[0] altijd de fast velden bevat
+    if isinstance(result, dict) and days and isinstance(days[0], dict):
+        days[0]["dish_name"] = result.get("dish_name", days[0].get("dish_name", "Peet kiest iets lekkers"))
+        days[0]["ingredients"] = result.get("ingredients", days[0].get("ingredients", []))
+        days[0]["why"] = result.get("why", days[0].get("why", ""))
+        days[0]["persons"] = llm_context.get("persons", days[0].get("persons", ""))
+
+        prep = result.get("preparation", [])
+        if isinstance(prep, list):
+            days[0]["preparation"] = prep
+        elif isinstance(prep, str):
+            days[0]["preparation"] = prep
+        else:
+            days[0]["preparation"] = []
+
+    # PDF (cache per keuze)
     if "pdf_path" not in st.session_state:
         st.session_state["pdf_path"] = build_plan_pdf(
             days=days,
@@ -291,7 +318,6 @@ def main():
                 mime="application/pdf",
                 use_container_width=True,
             )
-
 
 if __name__ == "__main__":
     main()
