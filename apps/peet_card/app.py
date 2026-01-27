@@ -129,7 +129,22 @@ def main():
         "allergies": qp("allergies", ""),
     }
 
-    llm_context = build_context(raw_context)
+    creative_context = raw_context.copy()
+
+    kitchen = creative_context.get("kitchen")
+    if kitchen:
+        creative_context["kitchen"] = f"inspiratie uit de {kitchen} keuken"
+
+    preference = creative_context.get("preference")
+    if preference:
+        creative_context["preference"] = f"voorkeur richting {preference} (geen beperking)"
+
+    moment = creative_context.get("moment")
+    if moment:
+        creative_context["moment"] = f"sfeer: {moment}"
+
+    llm_context = build_context(creative_context)
+
 
     if llm_context == "__FORWARD__":
         st.warning("Voor meerdere dagen: gebruik Peet Kiest Vooruit.")
@@ -145,7 +160,7 @@ def main():
         return call_peet_text(context)
 
     if "peet_result" not in st.session_state:
-        with st.spinner("Peet zoekt de allerlekkerste keuze voor je uit..."):
+        with st.spinner("We heben meer dan 1 miljoen gerechten, binnen 15 seconden heeft Peet de allerlekkerste voor je uitgekozen ......"):
             st.session_state["peet_result"] = fetch_peet_choice(llm_context)
 
     free_text = st.session_state["peet_result"]
