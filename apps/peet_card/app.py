@@ -29,6 +29,25 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.markdown(
+    """
+    <style>
+    /* Verberg Streamlit header (Share + menu) */
+    header {visibility: hidden;}
+    
+    /* Verberg footer */
+    footer {visibility: hidden;}
+    
+    /* Trek content iets omhoog */
+    .block-container {
+        padding-top: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # -------------------------------------------------
 # Bootstrap project root
 # -------------------------------------------------
