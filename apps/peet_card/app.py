@@ -220,115 +220,29 @@ def main():
 
     st.markdown("---")
 
-st.markdown("### Zo pak je het aan")
-if isinstance(recipe_steps, list) and recipe_steps:
-    for step in recipe_steps:
-        if isinstance(step, str) and step.strip():
-            st.write(step.strip())
-else:
-    st.write("Bereiding niet beschikbaar.")
-
-# -------------------------------------------------
-# PDF direct vanuit FAST output
-# -------------------------------------------------
-import os
-
-days = [{
-    "dish_name": dish_name,
-    "ingredients": ingredients,
-    "preparation": recipe_steps,
-    "why": why,
-    "persons": persons_label,
-}]
-
-days_count = 1
-
-if "pdf_path" not in st.session_state:
-    st.session_state["pdf_path"] = build_plan_pdf(
-        days=days,
-        days_count=days_count,
-    )
-
-pdf_path = st.session_state["pdf_path"]
-
-if pdf_path and os.path.exists(pdf_path):
-    with open(pdf_path, "rb") as f:
-        st.download_button(
-            label="Download als PDF",
-            data=f,
-            file_name=os.path.basename(pdf_path),
-            mime="application/pdf",
-            use_container_width=True,
-        )
-
-
-    # -------------------------------------------------
-    # 4) Centrale data
-    # -------------------------------------------------
-    days = result.get("days", [])
-    days_count = result.get("days_count", len(days))
-
-    if not days:
-        st.error("Geen gerecht gegenereerd.")
-        return
-
-    # Verrijk day[0] expliciet met LLM-output
-    days[0]["dish_name"] = dish_name
-    days[0]["preparation"] = "\n".join(recipe_steps)
-    days[0]["ingredients"] = ingredients
-
-    # -----------------------------
-    # Schermweergave
-    # -----------------------------
-    st.subheader(dish_name)
-    st.divider()
-
-    # Ingrediënten
-    st.subheader(f"Ingrediënten (voor {persons} personen)")
-
-    ingredients = days[0].get("ingredients", [])
-    if ingredients:
-        ingred_text = "\n".join(f"- {item}" for item in ingredients)
-        st.markdown(ingred_text)
-    else:
-        st.write("Geen ingrediënten beschikbaar.")
-
-
-    st.divider()
-
-    # Bereiding
-    st.subheader("Zo pak je het aan")
-
-    prep = days[0].get("preparation", "").strip()
-
-    if prep:
-        steps = [s.strip() for s in prep.split("\n") if s.strip()]
-        for step in steps:
-            st.write(step)
+    st.markdown("### Zo pak je het aan")
+    if isinstance(recipe_steps, list) and recipe_steps:
+        for step in recipe_steps:
+            if isinstance(step, str) and step.strip():
+                st.write(step.strip())
     else:
         st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # 6) PDF (FAST output = PDF output)
+    # PDF direct vanuit FAST output
     # -------------------------------------------------
     import os
 
-    # Zorg dat days[0] altijd de fast velden bevat
-    if isinstance(result, dict) and days and isinstance(days[0], dict):
-        days[0]["dish_name"] = result.get("dish_name", days[0].get("dish_name", "Peet kiest iets lekkers"))
-        days[0]["ingredients"] = result.get("ingredients", days[0].get("ingredients", []))
-        days[0]["why"] = result.get("why", days[0].get("why", ""))
-        days[0]["persons"] = llm_context.get("persons", days[0].get("persons", ""))
+    days = [{
+        "dish_name": dish_name,
+        "ingredients": ingredients,
+        "preparation": recipe_steps,
+        "why": why,
+        "persons": persons_label,
+    }]
 
-        prep = result.get("preparation", [])
-        if isinstance(prep, list):
-            days[0]["preparation"] = prep
-        elif isinstance(prep, str):
-            days[0]["preparation"] = prep
-        else:
-            days[0]["preparation"] = []
+    days_count = 1
 
-    # PDF (cache per keuze)
     if "pdf_path" not in st.session_state:
         st.session_state["pdf_path"] = build_plan_pdf(
             days=days,
@@ -346,6 +260,92 @@ if pdf_path and os.path.exists(pdf_path):
                 mime="application/pdf",
                 use_container_width=True,
             )
+
+
+        # -------------------------------------------------
+        # 4) Centrale data
+        # -------------------------------------------------
+        days = result.get("days", [])
+        days_count = result.get("days_count", len(days))
+
+        if not days:
+            st.error("Geen gerecht gegenereerd.")
+            return
+
+        # Verrijk day[0] expliciet met LLM-output
+        days[0]["dish_name"] = dish_name
+        days[0]["preparation"] = "\n".join(recipe_steps)
+        days[0]["ingredients"] = ingredients
+
+        # -----------------------------
+        # Schermweergave
+        # -----------------------------
+        st.subheader(dish_name)
+        st.divider()
+
+        # Ingrediënten
+        st.subheader(f"Ingrediënten (voor {persons} personen)")
+
+        ingredients = days[0].get("ingredients", [])
+        if ingredients:
+            ingred_text = "\n".join(f"- {item}" for item in ingredients)
+            st.markdown(ingred_text)
+        else:
+            st.write("Geen ingrediënten beschikbaar.")
+
+
+        st.divider()
+
+        # Bereiding
+        st.subheader("Zo pak je het aan")
+
+        prep = days[0].get("preparation", "").strip()
+
+        if prep:
+            steps = [s.strip() for s in prep.split("\n") if s.strip()]
+            for step in steps:
+                st.write(step)
+        else:
+            st.write("Bereiding niet beschikbaar.")
+
+        # -------------------------------------------------
+        # 6) PDF (FAST output = PDF output)
+        # -------------------------------------------------
+        import os
+
+        # Zorg dat days[0] altijd de fast velden bevat
+        if isinstance(result, dict) and days and isinstance(days[0], dict):
+            days[0]["dish_name"] = result.get("dish_name", days[0].get("dish_name", "Peet kiest iets lekkers"))
+            days[0]["ingredients"] = result.get("ingredients", days[0].get("ingredients", []))
+            days[0]["why"] = result.get("why", days[0].get("why", ""))
+            days[0]["persons"] = llm_context.get("persons", days[0].get("persons", ""))
+
+            prep = result.get("preparation", [])
+            if isinstance(prep, list):
+                days[0]["preparation"] = prep
+            elif isinstance(prep, str):
+                days[0]["preparation"] = prep
+            else:
+                days[0]["preparation"] = []
+
+        # PDF (cache per keuze)
+        if "pdf_path" not in st.session_state:
+            st.session_state["pdf_path"] = build_plan_pdf(
+                days=days,
+                days_count=days_count,
+            )
+
+        pdf_path = st.session_state["pdf_path"]
+
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label="Download als PDF",
+                    data=f,
+                    file_name=os.path.basename(pdf_path),
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
 
 if __name__ == "__main__":
     main()
