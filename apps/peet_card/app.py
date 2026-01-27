@@ -21,6 +21,13 @@ st.markdown(
         font-family: 'Roboto Condensed', sans-serif;
     }
 
+    /* Force nette content breedte */
+    .main .block-container {
+        max-width: 720px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
     h1, h2, h3, h4, h5, h6 {
         font-weight: 700;
     }
