@@ -145,6 +145,20 @@ def main():
         
     llm_context = build_context(creative_context)
 
+    import json
+    import hashlib
+
+    # ---- context signature: verandert bij andere Carrd inputs
+    context_sig = hashlib.md5(
+        json.dumps(llm_context, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+    # ---- als input verandert: reset resultaat + pdf
+    if st.session_state.get("context_sig") != context_sig:
+        st.session_state["context_sig"] = context_sig
+        st.session_state.pop("peet_result", None)
+        st.session_state.pop("pdf_path", None)
+
 
     if llm_context == "__FORWARD__":
         st.warning("Voor meerdere dagen: gebruik Peet Kiest Vooruit.")
@@ -154,14 +168,16 @@ def main():
     # FAST FLOW
     # -------------------------------------------------
     @st.cache_data(show_spinner=False)
-    def fetch_peet_choice(context: dict):
+    def fetch_peet_choice(_sig: str, context: dict):
         if USE_FAST:
             return fetch_peet_choice_fast(context)
         return call_peet_text(context)
 
+
     if "peet_result" not in st.session_state:
         with st.spinner("We heben meer dan 1 miljoen gerechten, binnen 15 seconden heeft Peet de allerlekkerste voor je uitgekozen ......"):
-            st.session_state["peet_result"] = fetch_peet_choice(llm_context)
+            st.session_state["peet_result"] = fetch_peet_choice(context_sig, llm_context)
+
 
     free_text = st.session_state["peet_result"]
 
