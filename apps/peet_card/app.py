@@ -133,16 +133,16 @@ def main():
 
     kitchen = creative_context.get("kitchen")
     if kitchen:
-        creative_context["kitchen"] = f"inspiratie uit de {kitchen} keuken"
+        creative_context["kitchen"] = f"stijl: {kitchen} keuken, met creatieve twist"
 
     preference = creative_context.get("preference")
     if preference:
-        creative_context["preference"] = f"voorkeur richting {preference} (geen beperking)"
+        creative_context["preference"] = f"hoofdingrediënt voorkeur: {preference}"
 
     moment = creative_context.get("moment")
     if moment:
-        creative_context["moment"] = f"sfeer: {moment}"
-
+        creative_context["moment"] = f"sfeer: {moment}, maar blijf verrassend"
+        
     llm_context = build_context(creative_context)
 
 
