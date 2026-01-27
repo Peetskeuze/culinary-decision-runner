@@ -32,15 +32,26 @@ st.markdown(
 st.markdown(
     """
     <style>
-    /* Verberg Streamlit header (Share + menu) */
-    header {visibility: hidden;}
-    
-    /* Verberg footer */
-    footer {visibility: hidden;}
-    
-    /* Trek content iets omhoog */
+    header[data-testid="stHeader"] {
+        display: none;
+    }
+
+    footer {
+        display: none;
+    }
+
     .block-container {
-        padding-top: 1rem;
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 720px;
+    }
+
+    div[data-testid="stToolbar"] {
+        display: none;
+    }
+
+    div[data-testid="stDecoration"] {
+        display: none;
     }
     </style>
     """,
