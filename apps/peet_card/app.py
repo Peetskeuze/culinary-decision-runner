@@ -220,18 +220,46 @@ def main():
 
     st.markdown("---")
 
-    st.markdown("### Zo pak je het aan")
-    if isinstance(recipe_steps, list) and recipe_steps:
-        for step in recipe_steps:
-            if isinstance(step, str) and step.strip():
-                st.write(step.strip())
-    else:
-        st.write("Bereiding niet beschikbaar.")
+st.markdown("### Zo pak je het aan")
+if isinstance(recipe_steps, list) and recipe_steps:
+    for step in recipe_steps:
+        if isinstance(step, str) and step.strip():
+            st.write(step.strip())
+else:
+    st.write("Bereiding niet beschikbaar.")
 
-    # -------------------------------------------------
-    # Fast flow is leidend – oude engine niet meer uitvoeren
-    # -------------------------------------------------
-    return
+# -------------------------------------------------
+# PDF direct vanuit FAST output
+# -------------------------------------------------
+import os
+
+days = [{
+    "dish_name": dish_name,
+    "ingredients": ingredients,
+    "preparation": recipe_steps,
+    "why": why,
+    "persons": persons_label,
+}]
+
+days_count = 1
+
+if "pdf_path" not in st.session_state:
+    st.session_state["pdf_path"] = build_plan_pdf(
+        days=days,
+        days_count=days_count,
+    )
+
+pdf_path = st.session_state["pdf_path"]
+
+if pdf_path and os.path.exists(pdf_path):
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            label="Download als PDF",
+            data=f,
+            file_name=os.path.basename(pdf_path),
+            mime="application/pdf",
+            use_container_width=True,
+        )
 
 
     # -------------------------------------------------
