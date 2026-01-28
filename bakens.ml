@@ -132,3 +132,35 @@ Voorbeeld:
 - Tekst opgeschaald via Form Fields Mobile size (±1.2)
 - Rustige app-achtige look bereikt
 
+Gedaan ✅
+
+Het baken “Peet Kiest – Fast Flow test geïntegreerd” staat nu vast.
+Vanaf hier kunnen we altijd veilig terug naar:
+
+• snelle LLM flow actief
+• aantrekkelijke output + seizoensgevoel
+• PDF werkt
+• oude flow nog beschikbaar via switch
+
+Je kunt nu zonder stress verder testen 😄
+
+Wanneer jij er klaar voor bent:
+👉 start de app en kijk hoe Peet Kiest nu voelt in snelheid en kwaliteit
+
+Nieuw baken vastgelegd:
+
+“Peet Kiest – Peet-bereiding template + Kitchen als smaakprofiel (1-dag flow stabiel)”
+
+Dit staat nu voor:
+
+• rijke Peet-bereiding met flow + chef-touch
+• concrete hoeveelheden in ingrediënten
+• kitchen stuurt als smaakprofiel (geen label)
+• performance behouden
+• creativiteit terug
+
+Als je in een nieuwe chat zegt:
+
+👉 Peet Kiest – Peet-bereiding template + Kitchen als smaakprofiel (1-dag flow stabiel)
+
+pakken we direct hier weer op, zonder iets kwijt te zijn
