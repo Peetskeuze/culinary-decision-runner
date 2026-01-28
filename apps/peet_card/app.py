@@ -174,7 +174,7 @@ def main():
     if st.session_state.get("context_sig") != context_sig:
         st.session_state["context_sig"] = context_sig
 
-        with st.spinner("Peet is aan het kiezen…"):
+        with st.spinner("We hebben meer dan 1 miljoen gerechten en Peet is nu de allerlekkerste voor je aan het kiezen…"):
             st.session_state["peet_result"] = fetch_peet_choice(llm_context)
 
         st.session_state.pop("pdf_path", None)
