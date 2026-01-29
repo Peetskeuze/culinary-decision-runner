@@ -163,4 +163,15 @@ Als je in een nieuwe chat zegt:
 
 👉 Peet Kiest – Peet-bereiding template + Kitchen als smaakprofiel (1-dag flow stabiel)
 
-pakken we direct hier weer op, zonder iets kwijt te zijn
+pakken we direct hier weer op, zonder iets kwijt te
+
+Baken staat ✅
+
+Naam: “Peet Kiest – Streamlit branding verbergen”
+
+Als je dit baken later noemt, pakken we direct op bij:
+• Streamlit logo/menu/header/footer verbergen
+• native app look combineren met je PWA setup
+• strakke Peet Kiest UX zonder platformbranding
+
+Je kunt nu gerust weg zonder iets kwijt te raken 👍
