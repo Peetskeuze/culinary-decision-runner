@@ -119,10 +119,38 @@ def main():
         menu_items={}
     )
 
-    st.title("Peet gaat voor je kiezen.")
+    # ---------------- UI polish ----------------
+
+    st.markdown("""
+    <style>
+
+    [data-testid="stHeader"] { display: none; }
+    [data-testid="stDecoration"] { display: none; }
+
+    .block-container { padding-top: 1.2rem; }
+
+    h1 { font-size: 1.8rem !important; }
+    h2, h3 { font-size: 1.5rem !important; line-height: 1.2; }
+
+    * {
+        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ---------------- Titel ----------------
+
+    st.markdown(
+        "<h1>Peet gaat voor je kiezen.</h1>",
+        unsafe_allow_html=True
+    )
+
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
     # -------------------------------------------------
+
+
     # 1) Context bouwen (oude kwaliteit)
     # -------------------------------------------------
     llm_context = build_llm_context()
