@@ -1,75 +1,16 @@
 # -------------------------------------------------
-# Peet-Card — Vandaag (FAST FLOW + PDF)
+# Peet-Card — Vandaag (oude kwaliteit + nieuwe engine/PDF)
 # -------------------------------------------------
 
 import sys
 from pathlib import Path
-import os
+import json
 import time
 import hashlib
 import streamlit as st
-import random
-
-
-# -----------------------------
-# Font (Carrd stijl)
-# -----------------------------
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Roboto Condensed', sans-serif;
-    }
-
-    /* Force nette content breedte */
-    .main .block-container {
-        max-width: 720px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-        font-weight: 700;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    """
-    <style>
-    header[data-testid="stHeader"] {
-        display: none;
-    }
-
-    footer {
-        display: none;
-    }
-
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 2rem !important;
-        max-width: 720px;
-    }
-
-    div[data-testid="stToolbar"] {
-        display: none;
-    }
-
-    div[data-testid="stDecoration"] {
-        display: none;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 
 # -------------------------------------------------
-# Bootstrap project root
+# Bootstrap project root (lokaal + cloud)
 # -------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -79,20 +20,8 @@ if str(ROOT) not in sys.path:
 # Imports
 # -------------------------------------------------
 from core.llm import call_peet_text
-from core.fast_test.llm_fast import fetch_peet_choice_fast
-from context_builder import build_context
+from peet_engine.engine import plan
 from peet_engine.render_pdf import build_plan_pdf
-
-USE_FAST = True
-# -------------------------------------------------
-# Peet fetch wrapper (fast / normal)
-# -------------------------------------------------
-
-def fetch_peet_choice(context: dict):
-    if USE_FAST:
-        return fetch_peet_choice_fast(context)
-    else:
-        return call_peet_text(context)
 
 # -------------------------------------------------
 # Helpers
@@ -111,6 +40,73 @@ def to_int(val: str, default: int) -> int:
         return default
 
 
+def to_list(val: str) -> list[str]:
+    if not val:
+        return []
+    return [p.strip().lower() for p in str(val).split(",") if p.strip()]
+
+
+# -------------------------------------------------
+# Oude rijke context terugbrengen (dit is de magie)
+# -------------------------------------------------
+def build_llm_context() -> str:
+    """
+    Vrije tekstcontext zoals de oude werkende versie.
+    Geen JSON. Geen schema. Volledige sturing + variatie.
+    """
+
+    days = to_int(qp("days", "1"), 1)
+    if days in (2, 3, 5):
+        return "__FORWARD__"
+
+    persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
+
+    moment = qp("moment", "")
+    kitchen = qp("kitchen", "")
+    preference = qp("preference", "")
+    vegetarian = qp("vegetarian", "")
+    allergies = to_list(qp("allergies", ""))
+    nogo = to_list(qp("nogo", ""))
+
+    lines = []
+    lines.append("CONTEXT VANDAAG:")
+    lines.append(f"- persons: {persons}")
+
+    if moment:
+        lines.append(f"- moment: {moment}")
+
+    if kitchen:
+        lines.append(f"- kitchen (inspiratie): {kitchen}")
+
+    if preference:
+        lines.append(f"- preference (inspiratie): {preference}")
+
+    if vegetarian:
+        lines.append(f"- vegetarian: {vegetarian}")
+
+    if allergies:
+        lines.append(f"- allergies: {', '.join(allergies)}")
+
+    if nogo:
+        lines.append(f"- no-go: {', '.join(nogo)}")
+
+    lines.append("")
+    lines.append("KIES VRIJ.")
+    lines.append("GEEN STANDAARDGERECHTEN.")
+    lines.append("GEEN HERHALING.")
+    lines.append("RESPECTEER VEGETARISCH, ALLERGIEËN EN NO-GO’S VOLLEDIG.")
+
+    return "\n".join(lines)
+
+
+# -------------------------------------------------
+# LLM call met veilige caching
+# -------------------------------------------------
+@st.cache_data(show_spinner=False)
+def fetch_peet_choice(context_sig: str, context_text: str):
+    return call_peet_text(context_text)
+
+
 # -------------------------------------------------
 # App
 # -------------------------------------------------
@@ -127,129 +123,134 @@ def main():
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
     # -------------------------------------------------
-    # Context uit query params
+    # 1) Context bouwen (oude kwaliteit)
     # -------------------------------------------------
-    raw_context = {
-        "persons": max(1, min(12, to_int(qp("persons", "2"), 2))),
-        "time": qp("time", ""),
-        "moment": qp("moment", ""),
-        "preference": qp("preference", ""),
-        "kitchen": qp("kitchen", ""),
-        "fridge": qp("fridge", ""),
-        "nogo": qp("nogo", ""),
-        "allergies": qp("allergies", ""),
-    }
+    llm_context = build_llm_context()
 
-    creative_context = raw_context.copy()
-
-    kitchen = creative_context.get("kitchen")
-    if kitchen:
-        creative_context["kitchen"] = f"stijl: {kitchen} keuken, met creatieve twist"
-
-    preference = creative_context.get("preference")
-    if preference:
-        creative_context["preference"] = f"hoofdingrediënt voorkeur: {preference}"
-
-    moment = creative_context.get("moment")
-    if moment:
-        creative_context["moment"] = f"sfeer: {moment}, maar blijf verrassend"
-        
-    llm_context = build_context(creative_context)
-    llm_context["variation_seed"] = random.randint(1, 1_000_000)
-
-    import json
-    import hashlib
-
-    # ---- eerst forward check (NOOIT eerst AI call)
     if llm_context == "__FORWARD__":
         st.warning("Voor meerdere dagen: gebruik Peet Kiest Vooruit.")
         st.stop()
 
-    # ---- context signature: verandert bij andere Carrd inputs
+    # -------------------------------------------------
+    # 2) Context signature → nieuwe keuze bij andere input
+    # -------------------------------------------------
     context_sig = hashlib.md5(
-        json.dumps(llm_context, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        llm_context.encode("utf-8")
     ).hexdigest()
 
-    # ---- als input verandert: reset resultaat + pdf
     if st.session_state.get("context_sig") != context_sig:
         st.session_state["context_sig"] = context_sig
 
-        with st.spinner("We hebben meer dan 1 miljoen gerechten en Peet is nu de allerlekkerste voor je aan het kiezen…"):
-            st.session_state["peet_result"] = fetch_peet_choice(llm_context)
+        with st.spinner(
+            "We hebben meer dan 1 miljoen gerechten en Peet zoekt nu de allerlekkerste voor je uit…"
+        ):
+            st.session_state["peet_raw"] = fetch_peet_choice(
+                context_sig,
+                llm_context
+            )
 
         st.session_state.pop("pdf_path", None)
 
-    # ---- altijd resultaat ophalen uit state
-    free_text = st.session_state.get("peet_result")
-
-    if not isinstance(free_text, dict) or not free_text:
-        st.error("Geen geldig resultaat ontvangen. Refresh even.")
-        st.stop()
+    free_text = st.session_state.get("peet_raw")
 
     # -------------------------------------------------
-    # Data uit FAST output
+    # 3) JSON veilig parsen (van LLM)
     # -------------------------------------------------
-    dish_name = free_text.get("dish_name", "Peet kiest iets lekkers")
-    why = free_text.get("why", "")
-    ingredients = free_text.get("ingredients", [])
-    recipe_steps = free_text.get("preparation", [])
-    persons_label = llm_context.get("persons", "")
+    dish_name = "Peet kiest iets lekkers"
+    ingredients = []
+    recipe_steps = []
+
+    try:
+        data = free_text if isinstance(free_text, dict) else json.loads(free_text)
+
+        if isinstance(data.get("dish_name"), str):
+            dish_name = data["dish_name"].strip()
+
+        if isinstance(data.get("ingredients"), list):
+            ingredients = [
+                item.strip()
+                for item in data["ingredients"]
+                if isinstance(item, str) and item.strip()
+            ]
+
+        if isinstance(data.get("preparation"), list):
+            recipe_steps = [
+                step.strip()
+                for step in data["preparation"]
+                if isinstance(step, str) and step.strip()
+            ]
+
+    except Exception:
+        st.error("Er ging iets mis bij het verwerken van het gerecht.")
+        return
+
 
     # -------------------------------------------------
-    # Render scherm
+    # 4) Engine aanroepen (nieuwe structuur behouden)
+    # -------------------------------------------------
+    persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
+
+    engine_context = {
+        "days": 1,
+        "persons": persons,
+        "dish_name": dish_name,
+        "allergies": to_list(qp("allergies", "")),
+        "nogo": to_list(qp("nogo", "")),
+    }
+
+    result = plan(engine_context)
+
+    days = result.get("days", [])
+    days_count = result.get("days_count", len(days))
+
+    if not days:
+        st.error("Geen gerecht gegenereerd.")
+        return
+
+    # Verrijk dag 1 met LLM output
+    days[0]["dish_name"] = dish_name
+    days[0]["ingredients"] = ingredients
+    days[0]["preparation"] = "\n".join(recipe_steps)
+
+    # -------------------------------------------------
+    # Schermweergave
     # -------------------------------------------------
     st.subheader(dish_name)
+    st.divider()
 
-    if isinstance(why, str) and why.strip():
-        st.caption(why.strip())
+    st.subheader(f"Ingrediënten (voor {persons} personen)")
 
-    st.markdown("---")
-
-    st.markdown(f"### Ingrediënten (voor {persons_label} personen)")
-
-    if isinstance(ingredients, list) and ingredients:
-        for item in ingredients:
-            if isinstance(item, str) and item.strip():
-                st.write(f"• {item.strip()}")
+    if ingredients:
+        st.markdown("\n".join(f"- {i}" for i in ingredients))
     else:
         st.write("Geen ingrediënten beschikbaar.")
 
-    st.markdown("---")
+    st.divider()
 
-    st.markdown("### Zo pak je het aan")
+    st.subheader("Zo pak je het aan")
 
-    if isinstance(recipe_steps, list) and recipe_steps:
-        for step in recipe_steps:
-            if isinstance(step, str) and step.strip():
-                st.write(step.strip())
+    prep = days[0].get("preparation", "").strip()
+
+    if prep:
+        for step in [s for s in prep.split("\n") if s.strip()]:
+            st.write(step)
     else:
         st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # PDF vanuit FAST output
+    # 5) PDF (nieuwe flow behouden)
     # -------------------------------------------------
-    days = [{
-        "dish_name": dish_name,
-        "ingredients": ingredients,
-        "preparation": recipe_steps,
-        "why": why,
-        "persons": persons_label,
-    }]
+    import os
 
     if "pdf_path" not in st.session_state:
         st.session_state["pdf_path"] = build_plan_pdf(
             days=days,
-            days_count=1,
+            days_count=days_count,
         )
 
     pdf_path = st.session_state["pdf_path"]
 
     if pdf_path and os.path.exists(pdf_path):
-
-        btn_key = hashlib.md5(
-            f"{dish_name}|{pdf_path}".encode("utf-8")
-        ).hexdigest()
-
         with open(pdf_path, "rb") as f:
             st.download_button(
                 label="Download als PDF",
@@ -257,12 +258,8 @@ def main():
                 file_name=os.path.basename(pdf_path),
                 mime="application/pdf",
                 use_container_width=True,
-                key=f"pdf_download_{btn_key}",
             )
 
 
-# -------------------------------------------------
-# Entry point
-# -------------------------------------------------
 if __name__ == "__main__":
     main()
