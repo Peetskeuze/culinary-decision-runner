@@ -175,3 +175,8 @@ Als je dit baken later noemt, pakken we direct op bij:
 • strakke Peet Kiest UX zonder platformbranding
 
 Je kunt nu gerust weg zonder iets kwijt te raken 👍
+
+
+Baken gezet: “Peet Kiest – Fridge zwaarder meewegen”.
+
+Volgende keer pakken we direct op bij: prompt aanpassen zodat fridge echt een stevige rol krijgt (koelkast als bouwsteen), zonder dat je variatie en Peet-kwaliteit terugvalt

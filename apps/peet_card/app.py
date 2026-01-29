@@ -1,16 +1,16 @@
 # -------------------------------------------------
-# Peet-Card — Vandaag (oude kwaliteit + nieuwe engine/PDF)
+# Peet-Card — Vandaag (cleaned architecture)
 # -------------------------------------------------
 
 import sys
-from pathlib import Path
 import json
-import time
 import hashlib
+from pathlib import Path
+import os
 import streamlit as st
 
 # -------------------------------------------------
-# Bootstrap project root (lokaal + cloud)
+# Bootstrap project root (local + cloud)
 # -------------------------------------------------
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -23,37 +23,34 @@ from core.llm import call_peet_text
 from peet_engine.engine import plan
 from peet_engine.render_pdf import build_plan_pdf
 
+
 # -------------------------------------------------
-# Helpers
+# Query helpers
 # -------------------------------------------------
-def qp(name: str, default: str = "") -> str:
+def qp(name: str, default=""):
     v = st.query_params.get(name, default)
     if isinstance(v, list):
         return v[0] if v else default
     return v if v is not None else default
 
 
-def to_int(val: str, default: int) -> int:
+def to_int(val, default):
     try:
         return int(str(val).strip())
     except Exception:
         return default
 
 
-def to_list(val: str) -> list[str]:
+def to_list(val):
     if not val:
         return []
     return [p.strip().lower() for p in str(val).split(",") if p.strip()]
 
 
 # -------------------------------------------------
-# Oude rijke context terugbrengen (dit is de magie)
+# Context builder (vrije Peet-stijl)
 # -------------------------------------------------
-def build_llm_context() -> str:
-    """
-    Vrije tekstcontext zoals de oude werkende versie.
-    Geen JSON. Geen schema. Volledige sturing + variatie.
-    """
+def build_llm_context():
 
     days = to_int(qp("days", "1"), 1)
     if days in (2, 3, 5):
@@ -61,16 +58,18 @@ def build_llm_context() -> str:
 
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
-    moment = qp("moment", "")
-    kitchen = qp("kitchen", "")
-    preference = qp("preference", "")
-    vegetarian = qp("vegetarian", "")
-    allergies = to_list(qp("allergies", ""))
-    nogo = to_list(qp("nogo", ""))
+    moment = qp("moment")
+    kitchen = qp("kitchen")
+    preference = qp("preference")
+    vegetarian = qp("vegetarian")
 
-    lines = []
-    lines.append("CONTEXT VANDAAG:")
-    lines.append(f"- persons: {persons}")
+    allergies = to_list(qp("allergies"))
+    nogo = to_list(qp("nogo"))
+
+    lines = [
+        "CONTEXT VANDAAG:",
+        f"- persons: {persons}",
+    ]
 
     if moment:
         lines.append(f"- moment: {moment}")
@@ -90,25 +89,91 @@ def build_llm_context() -> str:
     if nogo:
         lines.append(f"- no-go: {', '.join(nogo)}")
 
-    lines.append("")
-    lines.append("KIES VRIJ.")
-    lines.append("GEEN STANDAARDGERECHTEN.")
-    lines.append("GEEN HERHALING.")
-    lines.append("RESPECTEER VEGETARISCH, ALLERGIEËN EN NO-GO’S VOLLEDIG.")
+    lines.extend([
+        "",
+        "KIES VRIJ.",
+        "GEEN STANDAARDGERECHTEN.",
+        "GEEN HERHALING.",
+        "RESPECTEER VEGETARISCH, ALLERGIEËN EN NO-GO’S VOLLEDIG."
+    ])
 
     return "\n".join(lines)
 
 
 # -------------------------------------------------
-# LLM call met veilige caching
+# Cached LLM call
 # -------------------------------------------------
 @st.cache_data(show_spinner=False)
-def fetch_peet_choice(context_sig: str, context_text: str):
+def fetch_peet_choice(context_text: str):
     return call_peet_text(context_text)
 
 
 # -------------------------------------------------
-# App
+# JSON parser (veilig)
+# -------------------------------------------------
+def parse_llm_output(raw):
+
+    dish_name = "Peet kiest iets lekkers"
+    ingredients = []
+    preparation = []
+
+    try:
+        data = raw if isinstance(raw, dict) else json.loads(raw)
+
+        if isinstance(data.get("dish_name"), str):
+            dish_name = data["dish_name"].strip()
+
+        if isinstance(data.get("ingredients"), list):
+            ingredients = [
+                i.strip() for i in data["ingredients"]
+                if isinstance(i, str) and i.strip()
+            ]
+
+        if isinstance(data.get("preparation"), list):
+            preparation = [
+                p.strip() for p in data["preparation"]
+                if isinstance(p, str) and p.strip()
+            ]
+
+    except Exception:
+        return None, None, None
+
+    return dish_name, ingredients, preparation
+
+
+# -------------------------------------------------
+# UI polish
+# -------------------------------------------------
+def inject_css():
+
+    st.markdown("""
+    <style>
+
+    [data-testid="stHeader"],
+    [data-testid="stDecoration"] {
+        display: none;
+    }
+
+    .block-container { 
+        padding-top: 1.2rem; 
+        max-height: 100vh;
+        overflow-y: auto !important;
+    }
+
+    * {
+        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+        overscroll-behavior: contain;
+    }
+
+    h1 { font-size: 1.6rem !important; }
+    h2, h3 { font-size: 1.5rem !important; }
+
+    </style>
+    """, unsafe_allow_html=True)
+
+
+# -------------------------------------------------
+# Main app
 # -------------------------------------------------
 def main():
 
@@ -119,61 +184,13 @@ def main():
         menu_items={}
     )
 
-    # ---------------- UI polish ----------------
+    inject_css()
 
-    st.markdown("""
-    <style>
-
-    [data-testid="stHeader"] { display: none; }
-    [data-testid="stDecoration"] { display: none; }
-
-    .block-container { 
-        padding-top: 1.2rem; 
-        overflow-y: auto !important;
-        max-height: 100vh;
-    }
-
-    h1 { font-size: 1.6rem !important; }
-    h2, h3 { font-size: 1.5rem !important; line-height: 1.2; }
-
-    * {
-        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-        overscroll-behavior: contain;
-    }
-
-    html, body {
-        height: 100%;
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    [data-testid="stAppViewContainer"] {
-        overflow-y: auto !important;
-        height: 100vh;
-    }
-
-    [data-testid="stSpinner"] svg {
-        width: 32px !important;
-        height: 32px !important;
-    }
-
-    </style>
-    """, unsafe_allow_html=True)
-
-
-    # ---------------- Titel ----------------
-
-    st.markdown(
-        "<h1>Peet gaat voor je kiezen.</h1>",
-        unsafe_allow_html=True
-    )
-
+    st.markdown("<h1>Peet gaat voor je kiezen.</h1>", unsafe_allow_html=True)
     st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
 
     # -------------------------------------------------
-
-
-    # 1) Context bouwen (oude kwaliteit)
+    # Build context
     # -------------------------------------------------
     llm_context = build_llm_context()
 
@@ -182,61 +199,34 @@ def main():
         st.stop()
 
     # -------------------------------------------------
-    # 2) Context signature → nieuwe keuze bij andere input
+    # Signature → nieuwe keuze bij andere input
     # -------------------------------------------------
-    context_sig = hashlib.md5(
-        llm_context.encode("utf-8")
-    ).hexdigest()
+    context_sig = hashlib.md5(llm_context.encode("utf-8")).hexdigest()
 
     if st.session_state.get("context_sig") != context_sig:
+
         st.session_state["context_sig"] = context_sig
 
         with st.spinner(
             "We hebben meer dan 1 miljoen gerechten en Peet zoekt nu de allerlekkerste voor je uit…"
         ):
-            st.session_state["peet_raw"] = fetch_peet_choice(
-                context_sig,
-                llm_context
-            )
+            st.session_state["raw_llm"] = fetch_peet_choice(llm_context)
 
         st.session_state.pop("pdf_path", None)
 
-    free_text = st.session_state.get("peet_raw")
+    raw_llm = st.session_state.get("raw_llm")
 
     # -------------------------------------------------
-    # 3) JSON veilig parsen (van LLM)
+    # Parse LLM output
     # -------------------------------------------------
-    dish_name = "Peet kiest iets lekkers"
-    ingredients = []
-    recipe_steps = []
+    dish_name, ingredients, preparation = parse_llm_output(raw_llm)
 
-    try:
-        data = free_text if isinstance(free_text, dict) else json.loads(free_text)
-
-        if isinstance(data.get("dish_name"), str):
-            dish_name = data["dish_name"].strip()
-
-        if isinstance(data.get("ingredients"), list):
-            ingredients = [
-                item.strip()
-                for item in data["ingredients"]
-                if isinstance(item, str) and item.strip()
-            ]
-
-        if isinstance(data.get("preparation"), list):
-            recipe_steps = [
-                step.strip()
-                for step in data["preparation"]
-                if isinstance(step, str) and step.strip()
-            ]
-
-    except Exception:
+    if not dish_name:
         st.error("Er ging iets mis bij het verwerken van het gerecht.")
         return
 
-
     # -------------------------------------------------
-    # 4) Engine aanroepen (nieuwe structuur behouden)
+    # Engine call
     # -------------------------------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
@@ -244,8 +234,8 @@ def main():
         "days": 1,
         "persons": persons,
         "dish_name": dish_name,
-        "allergies": to_list(qp("allergies", "")),
-        "nogo": to_list(qp("nogo", "")),
+        "allergies": to_list(qp("allergies")),
+        "nogo": to_list(qp("nogo")),
     }
 
     result = plan(engine_context)
@@ -257,13 +247,15 @@ def main():
         st.error("Geen gerecht gegenereerd.")
         return
 
-    # Verrijk dag 1 met LLM output
-    days[0]["dish_name"] = dish_name
-    days[0]["ingredients"] = ingredients
-    days[0]["preparation"] = "\n".join(recipe_steps)
+    # Verrijk dag 1 met LLM details
+    days[0].update({
+        "dish_name": dish_name,
+        "ingredients": ingredients,
+        "preparation": "\n".join(preparation),
+    })
 
     # -------------------------------------------------
-    # Schermweergave
+    # Screen rendering
     # -------------------------------------------------
     st.subheader(dish_name)
     st.divider()
@@ -276,24 +268,21 @@ def main():
         st.write("Geen ingrediënten beschikbaar.")
 
     st.divider()
-
     st.subheader("Zo pak je het aan")
 
-    prep = days[0].get("preparation", "").strip()
+    prep_text = days[0].get("preparation", "").strip()
 
-    if prep:
-        for step in [s for s in prep.split("\n") if s.strip()]:
+    if prep_text:
+        for step in [s for s in prep_text.split("\n") if s.strip()]:
             st.write(step)
     else:
         st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # PDF Knop
+    # PDF
     # -------------------------------------------------
-
-    import os
-
     if "pdf_path" not in st.session_state:
+
         st.session_state["pdf_path"] = build_plan_pdf(
             days=days,
             days_count=days_count,
@@ -304,7 +293,7 @@ def main():
     if pdf_path and os.path.exists(pdf_path):
         with open(pdf_path, "rb") as f:
             st.download_button(
-                label="Download als PDF",
+                "Download als PDF",
                 data=f,
                 file_name=os.path.basename(pdf_path),
                 mime="application/pdf",
@@ -312,7 +301,6 @@ def main():
             )
 
 
+# -------------------------------------------------
 if __name__ == "__main__":
     main()
-
-
