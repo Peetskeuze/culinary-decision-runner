@@ -129,7 +129,7 @@ def main():
 
     .block-container { padding-top: 1.2rem; }
 
-    h1 { font-size: 1.8rem !important; }
+    h1 { font-size: 1.5rem !important; }
     h2, h3 { font-size: 1.5rem !important; line-height: 1.2; }
 
     * {
