@@ -127,17 +127,39 @@ def main():
     [data-testid="stHeader"] { display: none; }
     [data-testid="stDecoration"] { display: none; }
 
-    .block-container { padding-top: 1.2rem; }
+    .block-container { 
+        padding-top: 1.2rem; 
+        overflow-y: auto !important;
+        max-height: 100vh;
+    }
 
-    h1 { font-size: 1.5rem !important; }
+    h1 { font-size: 1.6rem !important; }
     h2, h3 { font-size: 1.5rem !important; line-height: 1.2; }
 
     * {
         font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+        overscroll-behavior: contain;
+    }
+
+    html, body {
+        height: 100%;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        overflow-y: auto !important;
+        height: 100vh;
+    }
+
+    [data-testid="stSpinner"] svg {
+        width: 32px !important;
+        height: 32px !important;
     }
 
     </style>
     """, unsafe_allow_html=True)
+
 
     # ---------------- Titel ----------------
 
@@ -266,8 +288,9 @@ def main():
         st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
-    # 5) PDF (nieuwe flow behouden)
+    # PDF Knop
     # -------------------------------------------------
+
     import os
 
     if "pdf_path" not in st.session_state:
@@ -291,3 +314,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
