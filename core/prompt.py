@@ -41,7 +41,6 @@ Gebruik de context als inspiratie voor:
 Wanneer er ingrediënten in de koelkast zijn opgegeven, probeer deze actief te verwerken in het gerecht.
 Gebruik ze waar logisch en smakelijk, en laat ze bij voorkeur een zichtbare rol spelen in het gerecht.
 Alleen als een ingrediënt echt niet past binnen een goed gerecht, mag je het overslaan.
-Het is niet nodig om alle koelkastingrediënten te gebruiken, maar kies er één of meerdere die het gerecht versterken.
 
 
 Maar blijf creatief en verrassend.
