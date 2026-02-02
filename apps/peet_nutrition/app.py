@@ -5,28 +5,19 @@ from io import BytesIO
 from pathlib import Path
 
 import streamlit as st
-from dotenv import load_dotenv
 from openai import OpenAI
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm
-
-from core.nutrition_prompt import NUTRITION_SYSTEM_PROMPT
-
 
 # ----------------------------
-# Env + OpenAI client
+# OpenAI client (Streamlit Cloud compatible)
 # ----------------------------
-ROOT = Path(__file__).resolve().parents[1]  # ...\peet_nutrion_app
-load_dotenv(ROOT / ".env")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
 
 if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY ontbreekt. Zet hem in .env in de project root.")
+    st.error("OPENAI_API_KEY ontbreekt in Streamlit Secrets.")
+    st.stop()
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
