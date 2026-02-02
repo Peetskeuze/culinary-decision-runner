@@ -13,7 +13,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 
-from core.prompt import NUTRITION_SYSTEM_PROMPT
+from core.nutrition_prompt import NUTRITION_SYSTEM_PROMPT
 
 
 # ----------------------------
