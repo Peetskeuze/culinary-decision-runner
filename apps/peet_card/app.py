@@ -109,39 +109,6 @@ def fetch_peet_choice(context_text: str):
 
 
 # -------------------------------------------------
-# JSON parser (veilig)
-# -------------------------------------------------
-def parse_llm_output(raw):
-
-    dish_name = "Peet kiest iets lekkers"
-    ingredients = []
-    preparation = []
-
-    try:
-        data = raw if isinstance(raw, dict) else json.loads(raw)
-
-        if isinstance(data.get("dish_name"), str):
-            dish_name = data["dish_name"].strip()
-
-        if isinstance(data.get("ingredients"), list):
-            ingredients = [
-                i.strip() for i in data["ingredients"]
-                if isinstance(i, str) and i.strip()
-            ]
-
-        if isinstance(data.get("preparation"), list):
-            preparation = [
-                p.strip() for p in data["preparation"]
-                if isinstance(p, str) and p.strip()
-            ]
-
-    except Exception:
-        return None, None, None
-
-    return dish_name, ingredients, preparation
-
-
-# -------------------------------------------------
 # UI polish
 # -------------------------------------------------
 def inject_css():
@@ -171,11 +138,130 @@ def inject_css():
     </style>
     """, unsafe_allow_html=True)
 
+import json
+
+# -------------------------------------------------
+# JSON parser (Peet Card contract)
+# -------------------------------------------------
+def parse_llm_output(raw_llm: str):
+    """
+    Verwacht geldige JSON volgens vaste structuur.
+    Altijd veilige defaults.
+    """
+
+    try:
+        data = json.loads(raw_llm)
+    except Exception:
+        return "", [], [], None, {}
+
+    # -------------------------
+    # Gerechtnaam
+    # -------------------------
+    dish_name = data.get("dish_name", "")
+
+    # -------------------------
+    # Nutrition
+    # -------------------------
+    nutrition = data.get("nutrition", {})
+
+    calories = nutrition.get("calories_kcal", None)
+
+    protein_g = nutrition.get("protein_g", 0)
+    fat_g = nutrition.get("fat_g", 0)
+    carbs_g = nutrition.get("carbs_g", 0)
+
+    macro_ratio = nutrition.get("macro_ratio", {})
+
+    protein_pct = macro_ratio.get("protein_pct", 0)
+    fat_pct = macro_ratio.get("fat_pct", 0)
+    carbs_pct = macro_ratio.get("carbs_pct", 0)
+
+    nutrition_clean = {
+        "calories_kcal": calories,
+        "protein_g": protein_g,
+        "fat_g": fat_g,
+        "carbs_g": carbs_g,
+        "macro_ratio": {
+            "protein_pct": protein_pct,
+            "fat_pct": fat_pct,
+            "carbs_pct": carbs_pct,
+        },
+    }
+
+    # -------------------------
+    # Ingrediënten
+    # -------------------------
+    ingredients = data.get("ingredients", [])
+
+    if not isinstance(ingredients, list):
+        ingredients = []
+
+    # -------------------------
+    # Bereiding
+    # -------------------------
+    steps = data.get("steps", [])
+
+    if not steps:
+        steps = data.get("preparation", [])
+
+    if not isinstance(steps, list):
+        steps = []
+
+    return dish_name, ingredients, steps, calories, nutrition_clean
+# -------------------------------------------------
+# CSS styling (Roboto Condensed)
+# -------------------------------------------------
+def inject_css():
+    st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');
+
+    html, body, [class*="css"], p, div, span {
+        font-family: 'Roboto Condensed', sans-serif;
+        font-weight: 400;
+    }
+
+    h1, h2, h3, h4, h5 {
+        font-family: 'Roboto Condensed', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+    }
+
+    /* iets compacter gevoel zoals PDF */
+    p {
+        line-height: 1.35;
+    }
+
+    /* Ingrediënten strakker in kolommen */
+
+    .ingredients-list {
+        margin-top: 8px;
+    }
+
+    .ingredients-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 4px;
+    }
+
+    .ingredients-amount {
+        min-width: 90px;
+        font-weight: 500;
+        color: #222;
+    }
+
+    .ingredients-item {
+        flex: 1;
+    }
+
+    </style>
+    """, unsafe_allow_html=True)
 
 # -------------------------------------------------
 # Main app
 # -------------------------------------------------
 def main():
+    calories = None
 
     st.set_page_config(
         page_title="Peet kiest",
@@ -187,7 +273,7 @@ def main():
     inject_css()
 
     st.markdown("<h1>Peet gaat voor je kiezen.</h1>", unsafe_allow_html=True)
-    st.caption("Vandaag is het geregeld. Iedere dag weer iets nieuws.")
+    st.caption("Iedere dag weer anders. Iedere keer weer iets lekkers.")
 
     # -------------------------------------------------
     # Build context
@@ -216,14 +302,60 @@ def main():
 
     raw_llm = st.session_state.get("raw_llm")
 
+    if not raw_llm:
+        st.info("Peet is een gerecht aan het kiezen…")
+        st.stop()
+
+
     # -------------------------------------------------
     # Parse LLM output
     # -------------------------------------------------
-    dish_name, ingredients, preparation = parse_llm_output(raw_llm)
+    dish_name, ingredients, preparation, calories, nutrition = parse_llm_output(raw_llm)
 
     if not dish_name:
         st.error("Er ging iets mis bij het verwerken van het gerecht.")
         return
+
+
+    # -------------------------
+    # Calorieën normaliseren
+    # -------------------------
+    calories_kcal = None
+    if calories is not None:
+        try:
+            calories_kcal = int(float(str(calories).strip()))
+        except Exception:
+            calories_kcal = None
+
+
+    # -------------------------
+    # Macro’s ophalen
+    # -------------------------
+    protein_g = nutrition.get("protein_g", 0)
+    fat_g = nutrition.get("fat_g", 0)
+    carbs_g = nutrition.get("carbs_g", 0)
+
+    # -------------------------
+    # Percentages altijd zelf berekenen
+    # -------------------------
+    protein_pct = 0
+    fat_pct = 0
+    carbs_pct = 0
+
+    try:
+        protein_kcal = protein_g * 4
+        carbs_kcal = carbs_g * 4
+        fat_kcal = fat_g * 9
+
+        total_kcal = protein_kcal + carbs_kcal + fat_kcal
+
+        if total_kcal > 0:
+            protein_pct = round(protein_kcal / total_kcal * 100)
+            fat_pct = round(fat_kcal / total_kcal * 100)
+            carbs_pct = round(carbs_kcal / total_kcal * 100)
+
+    except Exception:
+        pass
 
     # -------------------------------------------------
     # Engine call
@@ -260,14 +392,69 @@ def main():
     st.subheader(dish_name)
     st.divider()
 
+    # -------------------------
+    # Calorieën + macro’s
+    # -------------------------
+    if calories_kcal is not None:
+
+        st.caption(f"Bevat {calories_kcal} kcal")
+
+        st.markdown(
+            f"""
+    **Eiwit:** {protein_g} g ({protein_pct}%)  
+    **Vet:** {fat_g} g ({fat_pct}%)  
+    **Koolhydraten:** {carbs_g} g ({carbs_pct}%)
+    """
+        )
+
+    # -------------------------
+    # Ingrediënten
+    # -------------------------
     st.subheader(f"Ingrediënten (voor {persons} personen)")
 
     if ingredients:
-        st.markdown("\n".join(f"- {i}" for i in ingredients))
+
+        st.markdown('<div class="ingredients-list">', unsafe_allow_html=True)
+
+        for ing in ingredients:
+
+            if isinstance(ing, dict):
+                item = ing.get("item", "").strip()
+                amount = ing.get("amount", "").strip()
+
+            elif isinstance(ing, str):
+                parts = ing.split(" ", 1)
+                if len(parts) == 2:
+                    amount, item = parts
+                else:
+                    amount = ""
+                    item = ing.strip()
+            else:
+                continue
+
+            if item:
+
+                st.markdown(
+                    f"""
+                    <div class="ingredients-row">
+                        <div class="ingredients-amount">{amount}</div>
+                        <div class="ingredients-item">{item}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
     else:
         st.write("Geen ingrediënten beschikbaar.")
 
+
     st.divider()
+
+    # -------------------------
+    # Bereiding
+    # -------------------------
     st.subheader("Zo pak je het aan")
 
     prep_text = days[0].get("preparation", "").strip()
@@ -284,10 +471,12 @@ def main():
     if "pdf_path" not in st.session_state:
 
         st.session_state["pdf_path"] = build_plan_pdf(
-            days=days,
-            days_count=days_count,
+            dish_name=dish_name,
+            nutrition=nutrition,
+            ingredients=ingredients,
+            preparation=preparation
         )
-
+        
     pdf_path = st.session_state["pdf_path"]
 
     if pdf_path and os.path.exists(pdf_path):
@@ -300,7 +489,5 @@ def main():
                 use_container_width=True,
             )
 
-
-# -------------------------------------------------
 if __name__ == "__main__":
     main()

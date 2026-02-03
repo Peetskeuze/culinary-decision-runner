@@ -1,41 +1,35 @@
+import os
+
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
-import os
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+pdfmetrics.registerFont(
+    TTFont("RobotoCondensed", "peet_engine/fonts/RobotoCondensed-Regular.ttf")
+)
+
+pdfmetrics.registerFont(
+    TTFont("RobotoCondensed-Bold", "peet_engine/fonts/RobotoCondensed-Bold.ttf")
+)
 
 
-def build_plan_pdf(days: list, days_count: int) -> str:
-    if not days:
+
+
+def build_plan_pdf(dish_name, nutrition, ingredients, preparation) -> str:
+    if not dish_name:
         return ""
 
-    day = days[0]
-
-    dish_name = day.get("dish_name", "Peet kiest iets lekkers")
-
-    # FAST kan preparation als list geven; classic vaak als string met \n
-    preparation_raw = day.get("preparation", "")
-    if isinstance(preparation_raw, list):
-        steps = [s.strip() for s in preparation_raw if isinstance(s, str) and s.strip()]
-    elif isinstance(preparation_raw, str):
-        steps = [s.strip() for s in preparation_raw.split("\n") if s.strip()]
-    else:
-        steps = []
-
-    ingredients = day.get("ingredients", [])
-    if not isinstance(ingredients, list):
-        ingredients = []
-
-    why = day.get("why", "")
-    if not isinstance(why, str):
-        why = ""
-
-    persons = day.get("persons", "")
-    persons_label = f" (voor {persons} personen)" if persons else ""
-
-    # Bestandsnaam = gerecht
+    # Bestandsnaam veilig maken
     safe_name = "".join(c for c in dish_name if c.isalnum() or c in " -_").rstrip()
     filename = f"{safe_name}.pdf"
 
@@ -54,67 +48,148 @@ def build_plan_pdf(days: list, days_count: int) -> str:
 
     styles = getSampleStyleSheet()
 
-    # Titels wat strakker en rustiger
+    # -------------------------------------------------
+    # Stijlen
+    # -------------------------------------------------
+
     styles.add(ParagraphStyle(
         name="DishTitle",
         fontSize=18,
         leading=22,
-        spaceAfter=10,
-        fontName="Helvetica-Bold"
+        spaceAfter=6,
+        fontName="RobotoCondensed-Bold"
     ))
 
     styles.add(ParagraphStyle(
-        name="Why",
+        name="Tagline",
         fontSize=10.5,
+        leading=14,
+        spaceAfter=10,
+        textColor=colors.grey
+    ))
+
+    styles.add(ParagraphStyle(
+        name="Macros",
+        fontSize=11,
         leading=15,
-        spaceAfter=10
+        spaceAfter=16,
+        spaceBefore=6
     ))
 
     styles.add(ParagraphStyle(
         name="Section",
         fontSize=13,
         leading=16,
-        spaceBefore=14,
+        spaceBefore=16,
         spaceAfter=8,
-        fontName="Helvetica-Bold"
+        fontName="RobotoCondensed-Bold"
     ))
 
     styles.add(ParagraphStyle(
         name="Body",
         fontSize=10.5,
-        leading=15,
-        spaceAfter=4
+        leading=13,
+        spaceAfter=6
     ))
 
     story = []
 
-    # Titel
+    # -------------------------------------------------
+    # Titel + kleine Peet touch (polish 1)
+    # -------------------------------------------------
+
     story.append(Paragraph(dish_name, styles["DishTitle"]))
+    story.append(Paragraph("Peet kiest iets dat vandaag past.", styles["Tagline"]))
 
-    # Why (Peet-zin)
-    if why.strip():
-        story.append(Paragraph(why.strip(), styles["Why"]))
+    # -------------------------------------------------
+    # Macro blok
+    # -------------------------------------------------
 
+    if isinstance(nutrition, dict):
+        kcal = nutrition.get("calories_kcal", "")
+        protein = nutrition.get("protein_g", "")
+        fat = nutrition.get("fat_g", "")
+        carbs = nutrition.get("carbs_g", "")
+
+        macro_block = f"""
+        <b>{kcal} kcal</b><br/>
+        Eiwit: {protein} g<br/>
+        Vet: {fat} g<br/>
+        Koolhydraten: {carbs} g
+        """
+
+        story.append(Paragraph(macro_block, styles["Macros"]))
+
+    # -------------------------------------------------
     # Ingrediënten
-    story.append(Paragraph(f"Ingrediënten{persons_label}", styles["Section"]))
+    # -------------------------------------------------
 
-    if ingredients:
-        for item in ingredients:
-            if isinstance(item, str) and item.strip():
-                story.append(Paragraph(f"• {item.strip()}", styles["Body"]))
+    story.append(Paragraph("Ingrediënten", styles["Section"]))
+
+    if ingredients and isinstance(ingredients, list):
+
+        rows = []
+
+        for ing in ingredients:
+
+            if isinstance(ing, dict):
+                amount = str(ing.get("amount", "")).strip()
+                item = str(ing.get("item", "")).strip()
+
+                if amount and item:
+                    rows.append([
+                        Paragraph(amount, styles["Body"]),
+                        Paragraph(item, styles["Body"])
+                    ])
+
+            elif isinstance(ing, str) and ing.strip():
+                rows.append([
+                    Paragraph("", styles["Body"]),
+                    Paragraph(ing.strip(), styles["Body"])
+                ])
+
+        if rows:
+            table = Table(
+                rows,
+                colWidths=[4.5 * cm, 9.5 * cm]   # 👈 breder + beter in balans
+            )
+
+            table.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ]))
+
+            story.append(table)
+
     else:
         story.append(Paragraph("Geen ingrediënten beschikbaar.", styles["Body"]))
+        
 
+    # -------------------------------------------------
+    # Kleine scheidingsruimte (polish 2)
+    # -------------------------------------------------
+
+    story.append(Spacer(1, 8))
+
+    # -------------------------------------------------
     # Bereiding
-    story.append(Paragraph("Zo pakken we het aan", styles["Section"]))
+    # -------------------------------------------------
 
-    if steps:
-        nr = 1
-        for step in steps:
-            story.append(Paragraph(f"{nr}. {step}", styles["Body"]))
-            nr += 1
+    story.append(Paragraph("Zo pak je het aan", styles["Section"]))
+
+    if preparation and isinstance(preparation, list):
+        for step in preparation:
+            if isinstance(step, str) and step.strip():
+                story.append(Paragraph(step.strip(), styles["Body"]))
     else:
         story.append(Paragraph("Bereiding niet beschikbaar.", styles["Body"]))
 
+    # -------------------------------------------------
+    # Build PDF
+    # -------------------------------------------------
+
     doc.build(story)
+
     return path

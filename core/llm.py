@@ -6,8 +6,7 @@ import os
 import time
 from openai import OpenAI, RateLimitError, APIError, APITimeoutError
 
-from core.prompt import PROMPT_PEET_CARD_TEXT
-
+from core.nutrition_prompt import NUTRITION_SYSTEM_PROMPT
 
 # -------------------------------------------------
 # Config
@@ -24,7 +23,8 @@ RETRY_DELAY = 1.5   # seconden (exponentieel)
 # -------------------------------------------------
 # Public API (unchanged for other scripts)
 # -------------------------------------------------
-def call_peet_text(user_context: str, *, system_prompt: str = PROMPT_PEET_CARD_TEXT) -> str:
+def call_peet_text(user_context: str, *, system_prompt: str = NUTRITION_SYSTEM_PROMPT):
+
     """
     Peet-Card (vandaag)
 
@@ -46,7 +46,7 @@ def call_peet_text(user_context: str, *, system_prompt: str = PROMPT_PEET_CARD_T
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_context},
                 ],
-                max_output_tokens=800,   # ruim genoeg voor recept
+                max_output_tokens=1500,   # ruim genoeg voor recept
             )
 
 
