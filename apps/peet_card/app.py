@@ -418,20 +418,33 @@ def main():
 
         for ing in ingredients:
 
-            if isinstance(ing, dict):
-                item = ing.get("item", "").strip()
-                amount = ing.get("amount", "").strip()
+            amount = ""
+            item = ""
 
+            # Nieuwe JSON structuur (dict)
+            if isinstance(ing, dict):
+
+                amount = str(ing.get("amount", "")).strip()
+                item = str(ing.get("item", "")).strip()
+
+            # Fallback oude string structuur
             elif isinstance(ing, str):
-                parts = ing.split(" ", 1)
+
+                text = ing.strip()
+
+                amount = ""
+                item = text
+
+                # Splits op laatste spatie → houdt haakjes netjes bij hoeveelheid
+                parts = text.rsplit(" ", 1)
+
                 if len(parts) == 2:
                     amount, item = parts
-                else:
-                    amount = ""
-                    item = ing.strip()
-            else:
-                continue
 
+                amount = amount.strip()
+                item = item.strip()
+
+            # Render alleen als er iets zinnigs staat
             if item:
 
                 st.markdown(
@@ -448,9 +461,6 @@ def main():
 
     else:
         st.write("Geen ingrediënten beschikbaar.")
-
-
-    st.divider()
 
     # -------------------------
     # Bereiding
