@@ -64,6 +64,20 @@ def build_llm_context():
     kitchen = qp("kitchen")
     preference = qp("preference")
     vegetarian = qp("vegetarian")
+    time_raw = qp("time")
+    # -----------------------------
+    # Kooktijd interpretatie
+    # -----------------------------
+    cook_time_text = ""
+
+    if time_raw == "20":
+        cook_time_text = "Het gerecht moet binnen maximaal 20 minuten klaar zijn."
+
+    elif time_raw in ["30-45", "30_45", "30–45"]:
+        cook_time_text = "Het gerecht moet binnen ongeveer 30 tot 45 minuten klaar zijn."
+
+    elif time_raw in [">45", "45+", "meer dan 45"]:
+        cook_time_text = "Het gerecht mag langer duren en mag uitgebreider zijn."
 
     allergies = to_list(qp("allergies"))
     nogo = to_list(qp("nogo"))
@@ -72,6 +86,9 @@ def build_llm_context():
         "CONTEXT VANDAAG:",
         f"- persons: {persons}",
     ]
+
+    if cook_time_text:
+        lines.append(f"- kooktijd: {cook_time_text}")
 
     if moment:
         lines.append(f"- moment: {moment}")
@@ -424,41 +441,41 @@ def main():
                 item = str(ing.get("item", "")).strip()
 
             # Fallback oude string structuur
-            elif isinstance(ing, str):
+        elif isinstance(ing, str):
 
-                import re
+            import re
 
-                text = ing.strip()
+            text = ing.strip()
 
+            amount = ""
+            item = ""
+
+            # 1) Pak hoeveelheid vooraan
+            m = re.match(
+                r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
+                text,
+                re.IGNORECASE
+            )
+
+            if not m:
                 amount = ""
-                item = ""
+                item = text
 
-                # 1) Pak hoeveelheid vooraan
-                m = re.match(
-                    r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
-                    text,
-                    re.IGNORECASE
-                )
+            else:
+                amount = m.group(1).strip()
+                rest = m.group(2).strip()
 
-                if not m:
-                    amount = ""
-                    item = text
+                # 2) Alles na komma’s = toevoegingen
+                parts = [p.strip() for p in rest.split(",")]
 
+                core = parts[0]          # hoofdingrediënt
+                extras = parts[1:]       # beschrijvingen
+
+                # 3) Zet toevoegingen altijd achteraan
+                if extras:
+                    item = core + ", " + ", ".join(extras)
                 else:
-                    amount = m.group(1).strip()
-                    rest = m.group(2).strip()
-
-                    # 2) Alles na komma’s = toevoegingen
-                    parts = [p.strip() for p in rest.split(",")]
-
-                    core = parts[0]          # hoofdingrediënt
-                    extras = parts[1:]       # beschrijvingen
-
-                    # 3) Zet toevoegingen altijd achteraan
-                    if extras:
-                        item = core + ", " + ", ".join(extras)
-                    else:
-                        item = core
+                    item = core
 
 
             # Render alleen als er iets zinnigs staat

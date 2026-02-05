@@ -18,3 +18,7 @@ venv/
 __pycache__/
 *.pyc
 apps/**/output/
+*.pdf
+__pycache__/
+.pytest_cache/
+output/
