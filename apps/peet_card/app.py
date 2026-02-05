@@ -451,72 +451,59 @@ def main():
 
         st.markdown('<div class="ingredients-list">', unsafe_allow_html=True)
 
-
-    for ing in ingredients:
-
-        amount = ""
-        item = ""
-
-        # Nieuwe JSON structuur (dict)
-        if isinstance(ing, dict):
-
-            amount = str(ing.get("amount", "")).strip()
-            item = str(ing.get("item", "")).strip()
-
-        # Oude string structuur
-        elif isinstance(ing, str):
-
-            import re
-
-            text = ing.strip()
+        for ing in ingredients:
 
             amount = ""
             item = ""
 
-            # 1) Pak hoeveelheid vooraan
-            m = re.match(
-                r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
-                text,
-                re.IGNORECASE
-            )
+            # Nieuwe JSON structuur
+            if isinstance(ing, dict):
+                amount = str(ing.get("amount", "")).strip()
+                item = str(ing.get("item", "")).strip()
 
-            if not m:
-                amount = ""
-                item = text
+            # Oude string structuur
+            elif isinstance(ing, str):
 
-            else:
-                amount = m.group(1).strip()
-                rest = m.group(2).strip()
+                import re
+                text = ing.strip()
 
-                # 2) Alles na komma’s = toevoegingen
-                parts = [p.strip() for p in rest.split(",")]
+                m = re.match(
+                    r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
+                    text,
+                    re.IGNORECASE
+                )
 
-                core = parts[0]
-                extras = parts[1:]
-
-                # 3) Zet toevoegingen altijd achteraan
-                if extras:
-                    item = core + ", " + ", ".join(extras)
+                if not m:
+                    item = text
                 else:
-                    item = core
+                    amount = m.group(1).strip()
+                    rest = m.group(2).strip()
 
-        # Render alleen als er iets zinnigs staat
-        if item:
+                    parts = [p.strip() for p in rest.split(",")]
+                    core = parts[0]
+                    extras = parts[1:]
 
-            st.markdown(
-                f"""
-                <div class="ingredients-row">
-                    <div class="ingredients-amount">{amount}</div>
-                    <div class="ingredients-item">{item}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+                    if extras:
+                        item = core + ", " + ", ".join(extras)
+                    else:
+                        item = core
 
+            if item:
+                st.markdown(
+                    f"""
+                    <div class="ingredients-row">
+                        <div class="ingredients-amount">{amount}</div>
+                        <div class="ingredients-item">{item}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # sluit container netjes
+        st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         st.write("Geen ingrediënten beschikbaar.")
-
 
     # -------------------------
     # Bereiding
