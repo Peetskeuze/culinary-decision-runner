@@ -25,7 +25,7 @@ pdfmetrics.registerFont(
 
 
 
-def build_plan_pdf(dish_name, nutrition, ingredients, preparation) -> str:
+def build_plan_pdf(dish_name, nutrition, ingredients, preparation, image_path=None) -> str:
     if not dish_name:
         return ""
 
@@ -95,11 +95,18 @@ def build_plan_pdf(dish_name, nutrition, ingredients, preparation) -> str:
     story = []
 
     # -------------------------------------------------
-    # Titel + kleine Peet touch (polish 1)
+    # Afbeelding
     # -------------------------------------------------
+
+    from reportlab.platypus import Image
+
+    if image_path and os.path.exists(image_path):
+        story.append(Image(image_path, width=12 * cm, height=8 * cm))
+        story.append(Spacer(1, 10))
 
     story.append(Paragraph(dish_name, styles["DishTitle"]))
     story.append(Paragraph("Peet kiest iets dat vandaag past.", styles["Tagline"]))
+
 
     # -------------------------------------------------
     # Macro blok

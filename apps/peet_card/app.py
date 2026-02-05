@@ -1,27 +1,29 @@
-# -------------------------------------------------
-# Peet-Card — Vandaag (cleaned architecture)
-# -------------------------------------------------
-
 import sys
-import json
-import hashlib
 from pathlib import Path
-import os
-import streamlit as st
 
-# -------------------------------------------------
-# Bootstrap project root (local + cloud)
-# -------------------------------------------------
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+PROJECT_ROOT = Path(__file__).resolve().parent
+
+# Loop omhoog tot we de map met "core" vinden
+while not (PROJECT_ROOT / "core").exists():
+    PROJECT_ROOT = PROJECT_ROOT.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
 
 # -------------------------------------------------
 # Imports
 # -------------------------------------------------
+import json
+import hashlib
+import os
+import streamlit as st
+
 from core.llm import call_peet_text
 from peet_engine.engine import plan
 from peet_engine.render_pdf import build_plan_pdf
+from core.image_generator import generate_food_image
 
 
 # -------------------------------------------------
@@ -108,37 +110,6 @@ def fetch_peet_choice(context_text: str):
     return call_peet_text(context_text)
 
 
-# -------------------------------------------------
-# UI polish
-# -------------------------------------------------
-def inject_css():
-
-    st.markdown("""
-    <style>
-
-    [data-testid="stHeader"],
-    [data-testid="stDecoration"] {
-        display: none;
-    }
-
-    .block-container { 
-        padding-top: 1.2rem; 
-        max-height: 100vh;
-        overflow-y: auto !important;
-    }
-
-    * {
-        font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-        overscroll-behavior: contain;
-    }
-
-    h1 { font-size: 1.6rem !important; }
-    h2, h3 { font-size: 1.5rem !important; }
-
-    </style>
-    """, unsafe_allow_html=True)
-
-import json
 
 # -------------------------------------------------
 # JSON parser (Peet Card contract)
@@ -257,6 +228,13 @@ def inject_css():
     </style>
     """, unsafe_allow_html=True)
 
+#--------------------------------------------------
+# Extra helpers
+#--------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def async_generate_image(dish_name):
+    return generate_food_image(dish_name)
+
 # -------------------------------------------------
 # Main app
 # -------------------------------------------------
@@ -315,7 +293,6 @@ def main():
     if not dish_name:
         st.error("Er ging iets mis bij het verwerken van het gerecht.")
         return
-
 
     # -------------------------
     # Calorieën normaliseren
@@ -393,6 +370,25 @@ def main():
     st.divider()
 
     # -------------------------
+    # Afbeelding (on demand – stabiel & snel UX)
+    # -------------------------
+    img_slot = st.empty()
+
+    if "image_path" not in st.session_state:
+        st.session_state["image_path"] = None
+
+    if st.button("Toon afbeelding van dit gerecht"):
+
+        with st.spinner("Peet zet het gerecht alvast op tafel…"):
+            image_path = async_generate_image(dish_name)
+            st.session_state["image_path"] = image_path
+
+    if st.session_state["image_path"] and os.path.exists(st.session_state["image_path"]):
+        img_slot.image(st.session_state["image_path"], use_column_width=True)
+
+    image_path = st.session_state["image_path"]
+
+    # -------------------------
     # Calorieën + macro’s
     # -------------------------
     if calories_kcal is not None:
@@ -430,19 +426,40 @@ def main():
             # Fallback oude string structuur
             elif isinstance(ing, str):
 
+                import re
+
                 text = ing.strip()
 
                 amount = ""
-                item = text
+                item = ""
 
-                # Splits op laatste spatie → houdt haakjes netjes bij hoeveelheid
-                parts = text.rsplit(" ", 1)
+                # 1) Pak hoeveelheid vooraan
+                m = re.match(
+                    r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
+                    text,
+                    re.IGNORECASE
+                )
 
-                if len(parts) == 2:
-                    amount, item = parts
+                if not m:
+                    amount = ""
+                    item = text
 
-                amount = amount.strip()
-                item = item.strip()
+                else:
+                    amount = m.group(1).strip()
+                    rest = m.group(2).strip()
+
+                    # 2) Alles na komma’s = toevoegingen
+                    parts = [p.strip() for p in rest.split(",")]
+
+                    core = parts[0]          # hoofdingrediënt
+                    extras = parts[1:]       # beschrijvingen
+
+                    # 3) Zet toevoegingen altijd achteraan
+                    if extras:
+                        item = core + ", " + ", ".join(extras)
+                    else:
+                        item = core
+
 
             # Render alleen als er iets zinnigs staat
             if item:
@@ -475,18 +492,24 @@ def main():
     else:
         st.write("Bereiding niet beschikbaar.")
 
+
     # -------------------------------------------------
-    # PDF
+    # PDF (eerst zonder beeld, later automatisch met beeld)
     # -------------------------------------------------
-    if "pdf_path" not in st.session_state:
+    has_image = bool(image_path and os.path.exists(image_path))
+
+    if ("pdf_path" not in st.session_state) or (has_image and not st.session_state.get("_pdf_has_image", False)):
 
         st.session_state["pdf_path"] = build_plan_pdf(
             dish_name=dish_name,
             nutrition=nutrition,
             ingredients=ingredients,
-            preparation=preparation
+            preparation=preparation,
+            image_path=image_path if has_image else None
         )
-        
+
+        st.session_state["_pdf_has_image"] = has_image
+         
     pdf_path = st.session_state["pdf_path"]
 
     if pdf_path and os.path.exists(pdf_path):
