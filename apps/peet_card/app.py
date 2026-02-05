@@ -255,6 +255,7 @@ def async_generate_image(dish_name):
 # -------------------------------------------------
 # Main app
 # -------------------------------------------------
+
 def main():
     calories = None
 
@@ -327,7 +328,14 @@ def main():
     # -------------------------------------------------
     # Parse LLM output
     # -------------------------------------------------
-    dish_name, ingredients, preparation, calories, nutrition = parse_llm_output(raw_llm)
+
+    (
+        dish_name,
+        ingredients,
+        preparation,
+        calories,
+        nutrition,
+    ) = parse_llm_output(raw_llm)
 
     if not dish_name:
         st.error("Er ging iets mis bij het verwerken van het gerecht.")
@@ -442,6 +450,7 @@ def main():
     """
         )
 
+
     # -------------------------
     # Ingrediënten
     # -------------------------
@@ -463,31 +472,38 @@ def main():
 
             # Oude string structuur
             elif isinstance(ing, str):
-
                 import re
+
                 text = ing.strip()
 
-                m = re.match(
-                    r"^([\d.,\/\-\s]*(?:g|kg|ml|l|tl|el|teen|snuf|blokje|stuk|stuks)?(?:\s*\(.*?\))?)\s*(.*)$",
-                    text,
-                    re.IGNORECASE
-                )
+                # splits hoeveelheid + ingrediënt
+                parts = text.split(" ", 1)
 
-                if not m:
-                    item = text
+                if len(parts) == 2:
+                    amount = parts[0].strip()
+                    item = parts[1].strip()
                 else:
-                    amount = m.group(1).strip()
-                    rest = m.group(2).strip()
+                    amount = ""
+                    item = text
 
-                    parts = [p.strip() for p in rest.split(",")]
-                    core = parts[0]
-                    extras = parts[1:]
+                # menselijke hoeveelheden waarbij (xx g) weg mag
+                human_units = [
+                    "stuk", "stuks",
+                    "teen", "teentjes",
+                    "hand", "handje",
+                    "kleine", "grote",
+                    "el", "tl",
+                    "snuf", "snufje",
+                    "cm",
+                    "vel",
+                    "ca."
+                ]
 
-                    if extras:
-                        item = core + ", " + ", ".join(extras)
-                    else:
-                        item = core
+                for unit in human_units:
+                    if unit in amount.lower():
+                        item = re.sub(r"\(\s*[\d.,]+\s*(g|ml)\s*\)", "", item).strip()
 
+            # ---- Render netjes ----
             if item:
                 st.markdown(
                     f"""
@@ -499,7 +515,6 @@ def main():
                     unsafe_allow_html=True
                 )
 
-        # sluit container netjes
         st.markdown("</div>", unsafe_allow_html=True)
 
     else:
@@ -508,6 +523,7 @@ def main():
     # -------------------------
     # Bereiding
     # -------------------------
+
     if cook_time_min and cook_time_max:
 
         if cook_time_min == cook_time_max:
@@ -517,6 +533,16 @@ def main():
 
     else:
         st.subheader("Zo pak je het aan")
+
+
+    if preparation:
+
+        for step in preparation:
+            if str(step).strip():
+                st.write(step)
+
+    else:
+        st.write("Bereiding niet beschikbaar.")
 
     # -------------------------------------------------
     # PDF (eerst zonder beeld, later automatisch met beeld)

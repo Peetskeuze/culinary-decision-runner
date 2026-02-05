@@ -186,6 +186,55 @@ Vermijd exotische of onnodig ingewikkelde combinaties.
 Inspiratie uit gezond en dagelijks koken mag als denkkader dienen,
 maar nooit als receptbron.
 Noem geen namen of bronnen in de output.
+────────────────────
+BEREIDINGSTIJD — TIME MAPPING
+────────────────────
+
+De input "time" komt altijd in één van deze drie vormen:
+
+- "kort" = ongeveer 20 minuten
+- "normaal" = ongeveer 30 tot 45 minuten
+- "lang" = langer dan 45 minuten
+
+Gebruik deze mapping altijd bij het kiezen van het gerecht.
+
+Regels:
+
+Als time = "kort":
+- Kies gerechten die realistisch binnen ±20 minuten klaar zijn
+- Geen oven die lang nodig heeft
+- Geen stoofgerechten
+- Snelle bereidingen, wokken, bakken, simpele sauzen
+
+Als time = "normaal":
+- Kies gerechten die ±30–45 minuten vragen
+- Oven mag
+- Iets meer opbouw mag
+
+Als time = "lang":
+- Kies gerechten die langer mogen duren
+- Oven, sudderen, meerdere stappen toegestaan
+
+De gekozen bereidingstijd moet logisch voelbaar zijn in de bereiding.
+
+Overdrijf nooit naar boven.
+
+BELANGRIJK:
+
+De bereidingstijd is een harde beperking.
+
+Als de gekozen bereiding duidelijk langer duurt dan toegestaan voor de gekozen time,
+dan is het gerecht fout en moet een ander gerecht gekozen worden.
+
+Bij twijfel altijd een sneller gerecht kiezen, nooit langzamer.
+
+"kort" mag NOOIT langer aanvoelen dan ±25 minuten.
+"normaal" mag NOOIT boven ±50 minuten uitkomen.
+"lang" is de enige categorie waar langere bereidingen mogen.
+
+De bereidingstijd heeft altijd voorrang boven creativiteit of complexiteit.
+
+Snelle input = echt snel gerecht.
 
 ────────────────────
 OUTPUT REGELS (ZEER BELANGRIJK)
