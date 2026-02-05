@@ -427,20 +427,20 @@ def main():
 
     if ingredients:
 
-        st.markdown('<div class="ingredients-list">', unsafe_allow_html=True)
+        st.markdown('<div class="ingredients-list">', unsafe_allow_html
 
-        for ing in ingredients:
+    for ing in ingredients:
 
-            amount = ""
-            item = ""
+        amount = ""
+        item = ""
 
-            # Nieuwe JSON structuur (dict)
-            if isinstance(ing, dict):
+        # Nieuwe JSON structuur (dict)
+        if isinstance(ing, dict):
 
-                amount = str(ing.get("amount", "")).strip()
-                item = str(ing.get("item", "")).strip()
+            amount = str(ing.get("amount", "")).strip()
+            item = str(ing.get("item", "")).strip()
 
-            # Fallback oude string structuur
+        # Oude string structuur
         elif isinstance(ing, str):
 
             import re
@@ -468,8 +468,8 @@ def main():
                 # 2) Alles na komma’s = toevoegingen
                 parts = [p.strip() for p in rest.split(",")]
 
-                core = parts[0]          # hoofdingrediënt
-                extras = parts[1:]       # beschrijvingen
+                core = parts[0]
+                extras = parts[1:]
 
                 # 3) Zet toevoegingen altijd achteraan
                 if extras:
@@ -477,21 +477,19 @@ def main():
                 else:
                     item = core
 
+        # Render alleen als er iets zinnigs staat
+        if item:
 
-            # Render alleen als er iets zinnigs staat
-            if item:
+            st.markdown(
+                f"""
+                <div class="ingredients-row">
+                    <div class="ingredients-amount">{amount}</div>
+                    <div class="ingredients-item">{item}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-                st.markdown(
-                    f"""
-                    <div class="ingredients-row">
-                        <div class="ingredients-amount">{amount}</div>
-                        <div class="ingredients-item">{item}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         st.write("Geen ingrediënten beschikbaar.")
