@@ -498,7 +498,10 @@ def main():
     # -------------------------
     # Bereiding
     # -------------------------
-    st.subheader("Zo pak je het aan")
+    if cook_time_min == cook_time_max:
+        st.subheader(f"Zo pak je het aan, reken op ± {cook_time_max} min")
+    else:
+        st.subheader(f"Zo pak je het aan, reken op ± {cook_time_min}–{cook_time_max} min")
 
     prep_text = days[0].get("preparation", "").strip()
 
