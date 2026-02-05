@@ -19,6 +19,7 @@ import json
 import hashlib
 import os
 import streamlit as st
+import re
 
 from core.llm import call_peet_text
 from peet_engine.engine import plan
@@ -131,71 +132,182 @@ def fetch_peet_choice(context_text: str):
 # -------------------------------------------------
 # JSON parser (Peet Card contract)
 # -------------------------------------------------
-def parse_llm_output(raw_llm: str):
+def parse_llm_output(raw_llm):
     """
-    Verwacht geldige JSON volgens vaste structuur.
-    Altijd veilige defaults.
+    Robuuste parser voor Peet Card.
+    Normaliseert ingrediënten → altijd dict structuur.
+    Crasht nooit.
     """
 
+    # -------------------------
+    # Veilige defaults
+    # -------------------------
+    dish_name = ""
+    ingredients_clean = []
+    steps_clean = []
+    calories = None
+    nutrition_clean = {}
+
+    # -------------------------
+    # JSON laden
+    # -------------------------
     try:
-        data = json.loads(raw_llm)
+        if isinstance(raw_llm, str):
+            raw_llm = raw_llm.strip()
+
+            # eventuele ```json fences weg
+            if raw_llm.startswith("```"):
+                raw_llm = raw_llm.replace("```json", "").replace("```", "").strip()
+
+            data = json.loads(raw_llm)
+
+        elif isinstance(raw_llm, dict):
+            data = raw_llm
+
+        else:
+            return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+
     except Exception:
-        return "", [], [], None, {}
+        return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+
 
     # -------------------------
     # Gerechtnaam
     # -------------------------
-    dish_name = data.get("dish_name", "")
+    try:
+        if isinstance(data.get("dish_name"), str):
+            dish_name = data["dish_name"].strip()
+    except Exception:
+        pass
+
 
     # -------------------------
     # Nutrition
     # -------------------------
-    nutrition = data.get("nutrition", {})
+    try:
+        nutrition = data.get("nutrition", {})
 
-    calories = nutrition.get("calories_kcal", None)
+        if isinstance(nutrition, dict):
+            calories = nutrition.get("calories_kcal", None)
 
-    protein_g = nutrition.get("protein_g", 0)
-    fat_g = nutrition.get("fat_g", 0)
-    carbs_g = nutrition.get("carbs_g", 0)
+            nutrition_clean = {
+                "calories_kcal": calories,
+                "protein_g": nutrition.get("protein_g", 0),
+                "fat_g": nutrition.get("fat_g", 0),
+                "carbs_g": nutrition.get("carbs_g", 0),
+                "macro_ratio": {
+                    "protein_pct": nutrition.get("macro_ratio", {}).get("protein_pct", 0),
+                    "fat_pct": nutrition.get("macro_ratio", {}).get("fat_pct", 0),
+                    "carbs_pct": nutrition.get("macro_ratio", {}).get("carbs_pct", 0),
+                }
+            }
 
-    macro_ratio = nutrition.get("macro_ratio", {})
+    except Exception:
+        nutrition_clean = {}
 
-    protein_pct = macro_ratio.get("protein_pct", 0)
-    fat_pct = macro_ratio.get("fat_pct", 0)
-    carbs_pct = macro_ratio.get("carbs_pct", 0)
-
-    nutrition_clean = {
-        "calories_kcal": calories,
-        "protein_g": protein_g,
-        "fat_g": fat_g,
-        "carbs_g": carbs_g,
-        "macro_ratio": {
-            "protein_pct": protein_pct,
-            "fat_pct": fat_pct,
-            "carbs_pct": carbs_pct,
-        },
-    }
 
     # -------------------------
-    # Ingrediënten
+    # Ingrediënten normaliseren
     # -------------------------
-    ingredients = data.get("ingredients", [])
+    raw_ingredients = data.get("ingredients", [])
 
-    if not isinstance(ingredients, list):
-        ingredients = []
+    if not isinstance(raw_ingredients, list):
+        raw_ingredients = []
+
+    ingredients_clean = []
+
+    for ing in raw_ingredients:
+
+        if not isinstance(ing, dict):
+            continue
+
+        amount = str(ing.get("amount", "")).strip()
+        item = str(ing.get("item", "")).strip()
+        note = str(ing.get("note", "")).strip()
+
+        if not item:
+            continue
+
+        if note:
+            item = f"{item} ({note})"
+
+        ingredients_clean.append({
+            "amount": amount,
+            "item": item
+        })
+
+
+        # ---------
+        # Nieuwe JSON structuur
+        # ---------
+        if isinstance(ing, dict):
+
+            amount = str(ing.get("amount", "")).strip()
+            item = str(ing.get("item", "")).strip()
+
+        # ---------
+        # Oude string structuur
+        # ---------
+
+        ingredients_clean = []
+
+        for ing in raw_ingredients:
+
+            if isinstance(ing, dict):
+                amount = ing.get("amount", "").strip()
+                item = ing.get("item", "").strip()
+                note = ing.get("note", "").strip()
+
+                if item:
+                    if note:
+                        item = f"{item} ({note})"
+
+                    ingredients_clean.append({
+                        "amount": amount,
+                        "item": item
+                    })
+
+
+        # ---------
+        # Alleen toevoegen als item bestaat
+        # ---------
+        if item:
+            ingredients_clean.append({
+                "amount": amount,
+                "item": item
+            })
+
 
     # -------------------------
-    # Bereiding
+    # Bereiding / steps
     # -------------------------
-    steps = data.get("steps", [])
+    steps = data.get("steps")
 
     if not steps:
-        steps = data.get("preparation", [])
+        steps = data.get("preparation")
 
-    if not isinstance(steps, list):
-        steps = []
+    if isinstance(steps, list):
 
-    return dish_name, ingredients, steps, calories, nutrition_clean
+        for s in steps:
+            if isinstance(s, str):
+                txt = s.strip()
+                if txt:
+                    steps_clean.append(txt)
+
+    elif isinstance(steps, str):
+
+        # fallback: string met nieuwe regels
+        for line in steps.split("\n"):
+            line = line.strip()
+            if line:
+                steps_clean.append(line)
+
+
+    # -------------------------
+    # Return altijd veilig
+    # -------------------------
+    return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+
 # -------------------------------------------------
 # CSS styling (Roboto Condensed)
 # -------------------------------------------------
@@ -233,10 +345,18 @@ def inject_css():
     }
 
     .ingredients-amount {
-        min-width: 90px;
+        min-width: 65px;
+        text-align: right;
         font-weight: 500;
         color: #222;
+        white-space: nowrap;
     }
+
+    .ingredients-item {
+        flex: 1;
+        padding-left: 12px;
+    }
+
 
     .ingredients-item {
         flex: 1;
@@ -462,48 +582,9 @@ def main():
 
         for ing in ingredients:
 
-            amount = ""
-            item = ""
+            amount = ing.get("amount", "")
+            item = ing.get("item", "")
 
-            # Nieuwe JSON structuur
-            if isinstance(ing, dict):
-                amount = str(ing.get("amount", "")).strip()
-                item = str(ing.get("item", "")).strip()
-
-            # Oude string structuur
-            elif isinstance(ing, str):
-                import re
-
-                text = ing.strip()
-
-                # splits hoeveelheid + ingrediënt
-                parts = text.split(" ", 1)
-
-                if len(parts) == 2:
-                    amount = parts[0].strip()
-                    item = parts[1].strip()
-                else:
-                    amount = ""
-                    item = text
-
-                # menselijke hoeveelheden waarbij (xx g) weg mag
-                human_units = [
-                    "stuk", "stuks",
-                    "teen", "teentjes",
-                    "hand", "handje",
-                    "kleine", "grote",
-                    "el", "tl",
-                    "snuf", "snufje",
-                    "cm",
-                    "vel",
-                    "ca."
-                ]
-
-                for unit in human_units:
-                    if unit in amount.lower():
-                        item = re.sub(r"\(\s*[\d.,]+\s*(g|ml)\s*\)", "", item).strip()
-
-            # ---- Render netjes ----
             if item:
                 st.markdown(
                     f"""
@@ -519,9 +600,10 @@ def main():
 
     else:
         st.write("Geen ingrediënten beschikbaar.")
+        
 
     # -------------------------
-    # Bereiding
+    # Bereiding (ALTIJD tonen)
     # -------------------------
 
     if cook_time_min and cook_time_max:
@@ -536,11 +618,9 @@ def main():
 
 
     if preparation:
-
         for step in preparation:
             if str(step).strip():
                 st.write(step)
-
     else:
         st.write("Bereiding niet beschikbaar.")
 

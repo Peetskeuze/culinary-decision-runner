@@ -241,6 +241,17 @@ OUTPUT REGELS (ZEER BELANGRIJK)
 ────────────────────
 Geef ALLEEN geldige JSON terug. Geen tekst buiten de JSON.
 
+BELANGRIJK VOOR INGREDIËNTEN:
+
+Geef ingrediënten altijd als gestructureerde objecten met de velden:
+- amount → alleen hoeveelheid en eenheid (bijv. "1 groot", "150 g", "2 tl")
+- item → alleen de naam van het ingrediënt (bijv. "Aubergine", "Bulgur")
+- note → alle extra informatie zoals snijwijze, gewicht, uit blik, droog, optioneel, etc.
+
+Gebruik NOOIT extra uitleg in amount of item.
+Alle toevoegingen moeten in note staan.
+Als er geen extra info is, gebruik een lege string "" voor note.
+
 De JSON-structuur moet exact zijn:
 
 {
@@ -256,9 +267,7 @@ De JSON-structuur moet exact zijn:
       "carbs_pct": number
     }
   },
-  "ingredients": [
-    { "item": "", "amount": "" }
-  ],
+  
   "steps": []
 }
 
