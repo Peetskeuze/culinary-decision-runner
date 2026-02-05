@@ -243,14 +243,27 @@ Geef ALLEEN geldige JSON terug. Geen tekst buiten de JSON.
 
 BELANGRIJK VOOR INGREDIËNTEN:
 
-Geef ingrediënten altijd als gestructureerde objecten met de velden:
-- amount → alleen hoeveelheid en eenheid (bijv. "1 groot", "150 g", "2 tl")
-- item → alleen de naam van het ingrediënt (bijv. "Aubergine", "Bulgur")
-- note → alle extra informatie zoals snijwijze, gewicht, uit blik, droog, optioneel, etc.
+Geef ingrediënten altijd als gestructureerde objecten met exact deze velden:
+- amount → alleen hoeveelheid en eenheid (bijv. "150 g", "1 teen", "2 tl", "2 cm", "1 stuk")
+- item → alleen de naam van het ingrediënt (bijv. "Aubergine", "Bulgur", "Knoflook")
+- note → alle extra informatie zoals bereidingswijze, snijvorm, gewichtsaanduidingen, uit blik, droog, optioneel, etc.
 
-Gebruik NOOIT extra uitleg in amount of item.
-Alle toevoegingen moeten in note staan.
-Als er geen extra info is, gebruik een lege string "" voor note.
+Regels voor ingrediënten:
+• amount mag uitsluitend hoeveelheid + eenheid bevatten
+• toegestane eenheden: g, ml, el, tl, stuk, stuks, teen, cm
+• amount mag NOOIT haakjes, komma’s of beschrijvingen bevatten
+• item is alleen de ingrediëntnaam, nooit extra uitleg
+• alle toelichting hoort altijd in note
+• als er geen extra info is: note = ""
+
+FOUT (nooit doen):
+{ "amount": "250 g (in blokjes)", "item": "Aubergine", "note": "" }
+{ "amount": "1 teen, fijngehakt", "item": "Knoflook", "note": "" }
+
+GOED (altijd zo):
+{ "amount": "250 g", "item": "Aubergine", "note": "in blokjes of halve maantjes" }
+{ "amount": "1 teen", "item": "Knoflook", "note": "fijngehakt" }
+{ "amount": "2 cm", "item": "Gember", "note": "geraspt" }
 
 De JSON-structuur moet exact zijn:
 
@@ -267,12 +280,13 @@ De JSON-structuur moet exact zijn:
       "carbs_pct": number
     }
   },
-  
+  "ingredients": [
+    { "amount": "", "item": "", "note": "" }
+  ],
   "steps": []
 }
 
-Regels:
-
+Overige regels:
 - calories_kcal = totale calorieën van het gerecht
 - protein_g, fat_g, carbs_g = realistische waarden in grammen
 - macro_ratio wordt berekend met:
@@ -281,12 +295,13 @@ Regels:
   - vet = 9 kcal per gram
 - macro_ratio percentages tellen samen ongeveer op tot 100%
 - steps is een geordende lijst met bereidingsstappen
-- ingredients is een lijst met objecten (item + amount)
+- ingredients is een lijst met objecten (amount + item + note)
 - Geef NOOIT uitleg, commentaar of tekst buiten de JSON
 
+Denk eerst.
+Kies dan.
+Geef alleen JSON terug.
 
-
-────────────────────
 
 Denk eerst.
 Kies dan.

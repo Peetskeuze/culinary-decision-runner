@@ -205,73 +205,45 @@ def parse_llm_output(raw_llm):
     except Exception:
         nutrition_clean = {}
 
+    # -------------------------
+    # Ingrediënten (clean & contract-based)
+    # -------------------------
 
-    # -------------------------
-    # Ingrediënten normaliseren
-    # -------------------------
     raw_ingredients = data.get("ingredients", [])
-
-    if not isinstance(raw_ingredients, list):
-        raw_ingredients = []
 
     ingredients_clean = []
 
-    for ing in raw_ingredients:
-
-        if not isinstance(ing, dict):
-            continue
-
-        amount = str(ing.get("amount", "")).strip()
-        item = str(ing.get("item", "")).strip()
-        note = str(ing.get("note", "")).strip()
-
-        if not item:
-            continue
-
-        if note:
-            item = f"{item} ({note})"
-
-        ingredients_clean.append({
-            "amount": amount,
-            "item": item
-        })
-
-
-        # ---------
-        # Nieuwe JSON structuur
-        # ---------
-        if isinstance(ing, dict):
-
-            amount = str(ing.get("amount", "")).strip()
-            item = str(ing.get("item", "")).strip()
-
-        # ---------
-        # Oude string structuur
-        # ---------
-
-        ingredients_clean = []
+    if isinstance(raw_ingredients, list):
 
         for ing in raw_ingredients:
 
-            if isinstance(ing, dict):
-                amount = ing.get("amount", "").strip()
-                item = ing.get("item", "").strip()
-                note = ing.get("note", "").strip()
+            if not isinstance(ing, dict):
+                continue
 
-                if item:
-                    if note:
-                        item = f"{item} ({note})"
+            amount = str(ing.get("amount", "")).strip()
+            item = str(ing.get("item", "")).strip()
+            note = str(ing.get("note", "")).strip()
 
-                    ingredients_clean.append({
-                        "amount": amount,
-                        "item": item
-                    })
+            if not item:
+                continue
 
+            # safety: amount kort maken, rest naar note
+            m = re.match(r"^\s*([\d/.,\-–]+)\s*(g|ml|el|tl|stuk|stuks|teen|cm)?\s*(.*)$", amount, re.IGNORECASE)
 
-        # ---------
-        # Alleen toevoegen als item bestaat
-        # ---------
-        if item:
+            if m:
+                num = (m.group(1) or "").strip()
+                unit = (m.group(2) or "").strip()
+                rest = (m.group(3) or "").strip()
+
+                amount = f"{num} {unit}".strip() if unit else num
+
+                rest = rest.strip(" ,()")
+                if rest:
+                    note = f"{note}, {rest}".strip(", ") if note else rest
+
+            if note:
+                item = f"{item} ({note})"
+
             ingredients_clean.append({
                 "amount": amount,
                 "item": item
@@ -332,35 +304,48 @@ def inject_css():
         line-height: 1.35;
     }
 
-    /* Ingrediënten strakker in kolommen */
+    /* Ingrediënten strak in vaste kolommen (grid) */
 
     .ingredients-list {
         margin-top: 8px;
     }
 
     .ingredients-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(90px, 120px) 1fr;
         gap: 12px;
-        margin-bottom: 4px;
+        align-items: start;
+        margin-bottom: 6px;
     }
 
     .ingredients-amount {
-        min-width: 65px;
-        text-align: right;
+        text-align: left;
+        white-space: nowrap;
         font-weight: 500;
         color: #222;
-        white-space: nowrap;
     }
 
     .ingredients-item {
-        flex: 1;
-        padding-left: 12px;
+        text-align: left;
+        line-height: 1.35;
+        color: #222;
     }
 
+    /* Mobile optimalisatie */
 
-    .ingredients-item {
-        flex: 1;
+    @media (max-width: 600px) {
+
+        .ingredients-row {
+            grid-template-columns: 80px 1fr;
+            gap: 10px;
+        }
+
+        .ingredients-amount,
+        .ingredients-item {
+            font-size: 0.95rem;
+        }
     }
+
 
     </style>
     """, unsafe_allow_html=True)
