@@ -275,6 +275,28 @@ def main():
     # -------------------------------------------------
     llm_context = build_llm_context()
 
+    # -------------------------------------------------
+    # Kooktijd uit query interpreteren (voor UI)
+    # -------------------------------------------------
+    time_raw = qp("time")
+
+    # defaults
+    cook_time_min = None
+    cook_time_max = None
+
+    if time_raw == "20":
+        cook_time_min = 20
+        cook_time_max = 20
+
+    elif time_raw in ["30-45", "30_45", "30–45"]:
+        cook_time_min = 30
+        cook_time_max = 45
+
+    elif time_raw in [">45", "45+", "meer dan 45"]:
+        cook_time_min = 45
+        cook_time_max = 90   # bewust ruim voor “uitgebreid”
+
+
     if llm_context == "__FORWARD__":
         st.warning("Voor meerdere dagen: gebruik Peet Kiest Vooruit.")
         st.stop()
@@ -495,22 +517,19 @@ def main():
     else:
         st.write("Geen ingrediënten beschikbaar.")
 
+
     # -------------------------
     # Bereiding
     # -------------------------
-    if cook_time_min == cook_time_max:
-        st.subheader(f"Zo pak je het aan, reken op ± {cook_time_max} min")
+    if cook_time_min and cook_time_max:
+
+        if cook_time_min == cook_time_max:
+            st.subheader(f"Zo pak je het aan (± {cook_time_max} min)")
+        else:
+            st.subheader(f"Zo pak je het aan (± {cook_time_min}–{cook_time_max} min)")
+
     else:
-        st.subheader(f"Zo pak je het aan, reken op ± {cook_time_min}–{cook_time_max} min")
-
-    prep_text = days[0].get("preparation", "").strip()
-
-    if prep_text:
-        for step in [s for s in prep_text.split("\n") if s.strip()]:
-            st.write(step)
-    else:
-        st.write("Bereiding niet beschikbaar.")
-
+        st.subheader("Zo pak je het aan")
 
     # -------------------------------------------------
     # PDF (eerst zonder beeld, later automatisch met beeld)
