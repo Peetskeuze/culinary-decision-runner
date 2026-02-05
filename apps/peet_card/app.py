@@ -427,7 +427,8 @@ def main():
 
     if ingredients:
 
-        st.markdown('<div class="ingredients-list">', unsafe_allow_html
+        st.markdown('<div class="ingredients-list">', unsafe_allow_html=True)
+
 
     for ing in ingredients:
 
