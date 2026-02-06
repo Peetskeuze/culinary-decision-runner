@@ -1,16 +1,13 @@
+# -------------------------------------------------
+# Project root toevoegen aan PYTHONPATH
+# -------------------------------------------------
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# Loop omhoog tot we de map met "core" vinden
-while not (PROJECT_ROOT / "core").exists():
-    PROJECT_ROOT = PROJECT_ROOT.parent
-
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-
+if str(PROJECT_ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT.parent))
 
 # -------------------------------------------------
 # Imports
@@ -18,8 +15,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import json
 import hashlib
 import os
-import streamlit as st
 import re
+import streamlit as st
 
 from core.llm import call_peet_text
 from peet_engine.engine import plan
@@ -36,19 +33,16 @@ def qp(name: str, default=""):
         return v[0] if v else default
     return v if v is not None else default
 
-
 def to_int(val, default):
     try:
         return int(str(val).strip())
     except Exception:
         return default
 
-
 def to_list(val):
     if not val:
         return []
     return [p.strip().lower() for p in str(val).split(",") if p.strip()]
-
 
 # -------------------------------------------------
 # Context builder (vrije Peet-stijl)
@@ -148,6 +142,10 @@ def parse_llm_output(raw_llm):
     calories = None
     nutrition_clean = {}
 
+    cook_time_min = None
+    cook_time_max = None
+
+
     # -------------------------
     # JSON laden
     # -------------------------
@@ -155,20 +153,44 @@ def parse_llm_output(raw_llm):
         if isinstance(raw_llm, str):
             raw_llm = raw_llm.strip()
 
-            # eventuele ```json fences weg
             if raw_llm.startswith("```"):
                 raw_llm = raw_llm.replace("```json", "").replace("```", "").strip()
 
             data = json.loads(raw_llm)
 
+            print("\n===== LLM JSON OUTPUT =====")
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+            print("==========================\n")
+
         elif isinstance(raw_llm, dict):
             data = raw_llm
 
+            print("\n===== LLM JSON OUTPUT =====")
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+            print("==========================\n")
+
         else:
-            return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+            return (
+                dish_name,
+                ingredients_clean,
+                steps_clean,
+                calories,
+                nutrition_clean,
+                cook_time_min,
+                cook_time_max,
+            )
+
 
     except Exception:
-        return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+        return (
+            dish_name,
+            ingredients_clean,
+            steps_clean,
+            calories,
+            nutrition_clean,
+            cook_time_min,
+            cook_time_max,
+        )
 
 
     # -------------------------
@@ -204,6 +226,18 @@ def parse_llm_output(raw_llm):
 
     except Exception:
         nutrition_clean = {}
+
+    # -------------------------
+    # Kooktijd uit JSON
+    # -------------------------
+    try:
+        cook_time = data.get("cook_time", {})
+
+        if isinstance(cook_time, dict):
+            cook_time_min = cook_time.get("min")
+            cook_time_max = cook_time.get("max")
+    except Exception:
+        pass
 
     # -------------------------
     # Ingrediënten (clean & contract-based)
@@ -278,7 +312,16 @@ def parse_llm_output(raw_llm):
     # -------------------------
     # Return altijd veilig
     # -------------------------
-    return dish_name, ingredients_clean, steps_clean, calories, nutrition_clean
+    return (
+        dish_name,
+        ingredients_clean,
+        steps_clean,
+        calories,
+        nutrition_clean,
+        cook_time_min,
+        cook_time_max,
+    )
+
 
 # -------------------------------------------------
 # CSS styling (Roboto Condensed)
@@ -384,25 +427,7 @@ def main():
     # -------------------------------------------------
     # Kooktijd uit query interpreteren (voor UI)
     # -------------------------------------------------
-    time_raw = qp("time")
-
-    # defaults
-    cook_time_min = None
-    cook_time_max = None
-
-    if time_raw == "20":
-        cook_time_min = 20
-        cook_time_max = 20
-
-    elif time_raw in ["30-45", "30_45", "30–45"]:
-        cook_time_min = 30
-        cook_time_max = 45
-
-    elif time_raw in [">45", "45+", "meer dan 45"]:
-        cook_time_min = 45
-        cook_time_max = 90   # bewust ruim voor “uitgebreid”
-
-
+ 
     if llm_context == "__FORWARD__":
         st.warning("Voor meerdere dagen: gebruik Peet Kiest Vooruit.")
         st.stop()
@@ -440,7 +465,10 @@ def main():
         preparation,
         calories,
         nutrition,
+        cook_time_min,
+        cook_time_max,
     ) = parse_llm_output(raw_llm)
+
 
     if not dish_name:
         st.error("Er ging iets mis bij het verwerken van het gerecht.")
@@ -457,34 +485,61 @@ def main():
             calories_kcal = None
 
 
-    # -------------------------
-    # Macro’s ophalen
-    # -------------------------
-    protein_g = nutrition.get("protein_g", 0)
-    fat_g = nutrition.get("fat_g", 0)
-    carbs_g = nutrition.get("carbs_g", 0)
+    # -------------------------------------------------
+    # Engine call (persons eerst bepalen)
+    # -------------------------------------------------
+    persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
+
+    engine_context = {
+        "days": 1,
+        "persons": persons,
+        "dish_name": dish_name,
+        "allergies": to_list(qp("allergies")),
+        "nogo": to_list(qp("nogo")),
+    }
+
+    result = plan(engine_context)
+
+    days = result.get("days", [])
+    days_count = result.get("days_count", len(days))
+
+    if not days:
+        st.error("Geen gerecht gegenereerd.")
+        return
+
+    # Verrijk dag 1 met LLM details
+    days[0].update({
+        "dish_name": dish_name,
+        "ingredients": ingredients,
+        "steps": preparation,
+    })
 
     # -------------------------
-    # Percentages altijd zelf berekenen
+    # Macro’s per persoon
     # -------------------------
-    protein_pct = 0
-    fat_pct = 0
-    carbs_pct = 0
+    protein_total = float(nutrition.get("protein_g", 0) or 0)
+    fat_total = float(nutrition.get("fat_g", 0) or 0)
+    carbs_total = float(nutrition.get("carbs_g", 0) or 0)
 
-    try:
-        protein_kcal = protein_g * 4
-        carbs_kcal = carbs_g * 4
-        fat_kcal = fat_g * 9
+    protein_g = round(protein_total / persons, 1)
+    fat_g = round(fat_total / persons, 1)
+    carbs_g = round(carbs_total / persons, 1)
 
-        total_kcal = protein_kcal + carbs_kcal + fat_kcal
+    # -------------------------
+    # Macro percentages (altijd zelf berekend)
+    # -------------------------
+    protein_kcal = protein_g * 4
+    carbs_kcal = carbs_g * 4
+    fat_kcal = fat_g * 9
 
-        if total_kcal > 0:
-            protein_pct = round(protein_kcal / total_kcal * 100)
-            fat_pct = round(fat_kcal / total_kcal * 100)
-            carbs_pct = round(carbs_kcal / total_kcal * 100)
+    total_kcal_macros = protein_kcal + carbs_kcal + fat_kcal
 
-    except Exception:
-        pass
+    if total_kcal_macros > 0:
+        protein_pct = round(protein_kcal / total_kcal_macros * 100)
+        fat_pct = round(fat_kcal / total_kcal_macros * 100)
+        carbs_pct = round(carbs_kcal / total_kcal_macros * 100)
+    else:
+        protein_pct = fat_pct = carbs_pct = 0
 
     # -------------------------------------------------
     # Engine call
@@ -512,7 +567,7 @@ def main():
     days[0].update({
         "dish_name": dish_name,
         "ingredients": ingredients,
-        "preparation": "\n".join(preparation),
+        "steps": preparation,
     })
 
     # -------------------------------------------------
@@ -545,7 +600,11 @@ def main():
     # -------------------------
     if calories_kcal is not None:
 
-        st.caption(f"Bevat {calories_kcal} kcal")
+        kcal_per_person = round(calories_kcal / persons)
+
+        st.caption(
+            f"Bevat {calories_kcal} kcal totaal • ongeveer {kcal_per_person} kcal per persoon"
+        )
 
         st.markdown(
             f"""
@@ -554,7 +613,6 @@ def main():
     **Koolhydraten:** {carbs_g} g ({carbs_pct}%)
     """
         )
-
 
     # -------------------------
     # Ingrediënten
@@ -588,7 +646,7 @@ def main():
         
 
     # -------------------------
-    # Bereiding (ALTIJD tonen)
+    # Bereiding + kooktijd
     # -------------------------
 
     if cook_time_min and cook_time_max:
@@ -600,7 +658,6 @@ def main():
 
     else:
         st.subheader("Zo pak je het aan")
-
 
     if preparation:
         for step in preparation:
@@ -616,15 +673,32 @@ def main():
 
     if ("pdf_path" not in st.session_state) or (has_image and not st.session_state.get("_pdf_has_image", False)):
 
-        st.session_state["pdf_path"] = build_plan_pdf(
-            dish_name=dish_name,
-            nutrition=nutrition,
-            ingredients=ingredients,
-            preparation=preparation,
-            image_path=image_path if has_image else None
-        )
+            st.session_state["pdf_path"] = build_plan_pdf(
+                dish_name=dish_name,
+                nutrition=nutrition,
+                ingredients=ingredients,
+                preparation=preparation,
 
-        st.session_state["_pdf_has_image"] = has_image
+                cook_time_min=cook_time_min,
+                cook_time_max=cook_time_max,
+
+                calories_kcal=calories_kcal,
+                persons=persons,
+
+                protein_g=protein_g,
+                fat_g=fat_g,
+                carbs_g=carbs_g,
+
+                protein_pct=protein_pct,
+                fat_pct=fat_pct,
+                carbs_pct=carbs_pct,
+
+                image_path=image_path if has_image else None
+            )
+
+
+
+    st.session_state["_pdf_has_image"] = has_image
          
     pdf_path = st.session_state["pdf_path"]
 

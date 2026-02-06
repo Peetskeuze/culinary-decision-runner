@@ -6,7 +6,8 @@ import os
 import time
 from openai import OpenAI, RateLimitError, APIError, APITimeoutError
 
-from core.nutrition_prompt import NUTRITION_SYSTEM_PROMPT
+from core.prompt import PROMPT
+
 
 # -------------------------------------------------
 # Config
@@ -17,13 +18,12 @@ API_KEY = os.getenv("OPENAI_API_KEY")
 _client = OpenAI(api_key=API_KEY)
 
 MAX_RETRIES = 3
-RETRY_DELAY = 1.5   # seconden (exponentieel)
-
+RETRY_DELAY = 1.5  # seconden (exponentieel)
 
 # -------------------------------------------------
 # Public API (unchanged for other scripts)
 # -------------------------------------------------
-def call_peet_text(user_context: str, *, system_prompt: str = NUTRITION_SYSTEM_PROMPT):
+def call_peet_text(user_context: str, *, system_prompt: str = PROMPT):
 
     """
     Peet-Card (vandaag)

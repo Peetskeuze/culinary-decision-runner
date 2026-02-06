@@ -25,7 +25,30 @@ pdfmetrics.registerFont(
 
 
 
-def build_plan_pdf(dish_name, nutrition, ingredients, preparation, image_path=None) -> str:
+def build_plan_pdf(
+    dish_name,
+    nutrition,
+    ingredients,
+    preparation,
+
+    cook_time_min=None,
+    cook_time_max=None,
+
+    calories_kcal=None,
+    persons=1,
+
+    protein_g=0,
+    fat_g=0,
+    carbs_g=0,
+
+    protein_pct=0,
+    fat_pct=0,
+    carbs_pct=0,
+
+    image_path=None
+) -> str:
+
+
     if not dish_name:
         return ""
 
@@ -106,26 +129,43 @@ def build_plan_pdf(dish_name, nutrition, ingredients, preparation, image_path=No
 
     story.append(Paragraph(dish_name, styles["DishTitle"]))
     story.append(Paragraph("Peet kiest iets dat vandaag past.", styles["Tagline"]))
+    
+    #---------------------------------------------------
+    # Kooktijd + kcal per persoon (header)
+    #---------------------------------------------------
+
+    header_line = ""
+
+    if cook_time_min and cook_time_max:
+        if cook_time_min == cook_time_max:
+            header_line = f"{cook_time_max} min"
+        else:
+            header_line = f"{cook_time_min}–{cook_time_max} min"
+
+    if calories_kcal:
+        kcal_pp = round(calories_kcal / max(1, persons))
+        if header_line:
+            header_line += " • "
+        header_line += f"± {kcal_pp} kcal per persoon"
+
+    if header_line:
+        story.append(Paragraph(header_line, styles["Body"]))
+        story.append(Spacer(1, 6))
 
 
-    # -------------------------------------------------
-    # Macro blok
-    # -------------------------------------------------
+    #---------------------------------------------------
+    # Macro’s per persoon + percentages
+    #---------------------------------------------------
 
-    if isinstance(nutrition, dict):
-        kcal = nutrition.get("calories_kcal", "")
-        protein = nutrition.get("protein_g", "")
-        fat = nutrition.get("fat_g", "")
-        carbs = nutrition.get("carbs_g", "")
+    macro_block = f"""
+    <b>Eiwit:</b> {protein_g} g ({protein_pct}%) &nbsp;&nbsp;
+    <b>Vet:</b> {fat_g} g ({fat_pct}%) &nbsp;&nbsp;
+    <b>Koolhydraten:</b> {carbs_g} g ({carbs_pct}%)
+    """
 
-        macro_block = f"""
-        <b>{kcal} kcal</b><br/>
-        Eiwit: {protein} g<br/>
-        Vet: {fat} g<br/>
-        Koolhydraten: {carbs} g
-        """
+    story.append(Paragraph(macro_block, styles["Macros"]))
+    story.append(Spacer(1, 12))
 
-        story.append(Paragraph(macro_block, styles["Macros"]))
 
     # -------------------------------------------------
     # Ingrediënten
@@ -179,19 +219,26 @@ def build_plan_pdf(dish_name, nutrition, ingredients, preparation, image_path=No
     # -------------------------------------------------
 
     story.append(Spacer(1, 8))
-
-    # -------------------------------------------------
-    # Bereiding
-    # -------------------------------------------------
-
     story.append(Paragraph("Zo pak je het aan", styles["Section"]))
 
-    if preparation and isinstance(preparation, list):
-        for step in preparation:
-            if isinstance(step, str) and step.strip():
-                story.append(Paragraph(step.strip(), styles["Body"]))
+    if preparation:
+
+        if isinstance(preparation, list):
+            for step in preparation:
+                if str(step).strip():
+                    story.append(Paragraph(step, styles["Body"]))
+
+        elif isinstance(preparation, str):
+            for line in preparation.split("\n"):
+                line = line.strip()
+                if line:
+                    story.append(Paragraph(line, styles["Body"]))
+
     else:
         story.append(Paragraph("Bereiding niet beschikbaar.", styles["Body"]))
+
+
+
 
     # -------------------------------------------------
     # Build PDF
