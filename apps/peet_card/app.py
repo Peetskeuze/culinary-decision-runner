@@ -441,7 +441,7 @@ def main():
     # -------------------------
     if st.session_state.get("done"):
         st.markdown("## Klaar voor vandaag.")
-        st.caption("Peet heeft gekozen. Jij kunt koken.")
+        st.caption("PDF is bewaard Jij gaat punten scoren strakjes")
 
         st.markdown(
             """
