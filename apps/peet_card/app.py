@@ -760,7 +760,7 @@ def main():
 
             if downloaded:
                 st.session_state["done"] = True
-                st.experimental_rerun()
+                st.rerun()
 
 # -------------------------------------------------
 # App entrypoint
