@@ -407,6 +407,9 @@ def async_generate_image(dish_name):
 def main():
     calories = None
 
+    # -------------------------
+    # Page config (altijd bovenaan)
+    # -------------------------
     st.set_page_config(
         page_title="Peet kiest",
         layout="centered",
@@ -414,12 +417,49 @@ def main():
         menu_items={}
     )
 
+    # -------------------------
+    # Streamlit branding verbergen
+    # -------------------------
+    st.markdown(
+        """
+        <style>
+        #MainMenu {visibility: hidden;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # -------------------------
+    # CSS injectie (jouw styling)
+    # -------------------------
     inject_css()
 
+    # -------------------------
+    # Afsluitscherm na PDF-download
+    # -------------------------
+    if st.session_state.get("done"):
+        st.markdown("## Klaar voor vandaag.")
+        st.caption("Peet heeft gekozen. Jij kunt koken.")
+
+        st.markdown(
+            """
+            <div style="margin-top:40px; font-size:0.9rem; color:#666;">
+            Sluit dit scherm of kom later terug voor een nieuwe keuze.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.stop()
+
+    # -------------------------
+    # Header
+    # -------------------------
     st.markdown("<h1>Peet gaat voor je kiezen.</h1>", unsafe_allow_html=True)
     st.caption("Iedere dag weer anders. Iedere keer weer iets lekkers.")
 
-    # -------------------------------------------------
     # Build context
     # -------------------------------------------------
     llm_context = build_llm_context()
@@ -669,42 +709,48 @@ def main():
     # -------------------------------------------------
     # PDF (eerst zonder beeld, later automatisch met beeld)
     # -------------------------------------------------
+
     has_image = bool(image_path and os.path.exists(image_path))
 
-    if ("pdf_path" not in st.session_state) or (has_image and not st.session_state.get("_pdf_has_image", False)):
+    if (
+        "pdf_path" not in st.session_state
+        or (has_image and not st.session_state.get("_pdf_has_image", False))
+    ):
 
-            st.session_state["pdf_path"] = build_plan_pdf(
-                dish_name=dish_name,
-                nutrition=nutrition,
-                ingredients=ingredients,
-                preparation=preparation,
+        st.session_state["pdf_path"] = build_plan_pdf(
+            dish_name=dish_name,
+            nutrition=nutrition,
+            ingredients=ingredients,
+            preparation=preparation,
 
-                cook_time_min=cook_time_min,
-                cook_time_max=cook_time_max,
+            cook_time_min=cook_time_min,
+            cook_time_max=cook_time_max,
 
-                calories_kcal=calories_kcal,
-                persons=persons,
+            calories_kcal=calories_kcal,
+            persons=persons,
 
-                protein_g=protein_g,
-                fat_g=fat_g,
-                carbs_g=carbs_g,
+            protein_g=protein_g,
+            fat_g=fat_g,
+            carbs_g=carbs_g,
 
-                protein_pct=protein_pct,
-                fat_pct=fat_pct,
-                carbs_pct=carbs_pct,
+            protein_pct=protein_pct,
+            fat_pct=fat_pct,
+            carbs_pct=carbs_pct,
 
-                image_path=image_path if has_image else None
-            )
-
-
+            image_path=image_path if has_image else None
+        )
 
     st.session_state["_pdf_has_image"] = has_image
-         
-    pdf_path = st.session_state["pdf_path"]
+
+    pdf_path = st.session_state.get("pdf_path")
+
+    # -------------------------------------------------
+    # Download knop + afsluiten app
+    # -------------------------------------------------
 
     if pdf_path and os.path.exists(pdf_path):
         with open(pdf_path, "rb") as f:
-            st.download_button(
+            downloaded = st.download_button(
                 "Download als PDF",
                 data=f,
                 file_name=os.path.basename(pdf_path),
@@ -712,5 +758,13 @@ def main():
                 use_container_width=True,
             )
 
+            if downloaded:
+                st.session_state["done"] = True
+                st.experimental_rerun()
+
+# -------------------------------------------------
+# App entrypoint
+# -------------------------------------------------
 if __name__ == "__main__":
     main()
+
