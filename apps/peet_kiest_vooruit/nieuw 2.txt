@@ -1,0 +1,38 @@
+📍 BAKEN GEZET — PeetKiest Vooruit · UI opgeschoond (PDF = enige samenvatting)
+
+Status op dit punt
+
+✅ Dag-weergave werkt stabiel
+
+✅ Gerechten, ingrediënten en bereiding worden correct getoond
+
+✅ PDF-generatie gebruikt volledige planning + boodschappenlijst
+
+❌ Boodschappenlijst niet meer zichtbaar in de UI
+
+❌ Samenvatting/Planning-overzicht niet meer zichtbaar in de UI
+
+Bewuste keuzes
+
+De UI toont alleen wat nodig is om te koken
+
+De PDF is de enige plek voor:
+
+Boodschappenlijst
+
+Planning/samenvatting
+
+Geen feature flags, geen conditionals, geen extra state
+
+Andere apps niet geraakt
+
+Dit is nu de stabiele nul-lijn.
+
+👉 Hervatten vanaf dit baken betekent:
+
+verder met UX-polish
+
+of PDF-positionering
+
+of performance / monetization
+zonder opnieuw te twijfelen over deze keuze.

@@ -1,499 +1,428 @@
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
+from core.peet_theme import render_peet_hero
 
-import os
 import json
-import re
-import base64
-from io import BytesIO
-from datetime import date
-
+import os
+import hashlib
+import requests
+import urllib.parse
 import streamlit as st
 
-st.warning(
-    "Peet is in ontwikkeling. Houd je WhatsApp in de gaten, een nieuwe versie is onderweg."
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
+
+
+from core.llm import call_peet_vooruit
+from apps.Peet_Kiest_Vooruit.vooruit_context import (
+    parse_query_params,
+    compute_kitchen_plan,
+    next_rotation_index,
 )
-
-from openai import OpenAI
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-
-# =========================================================
-# IMPORTS CORE
-# =========================================================
-from core.prompts import PEET_KIEST_VOORUIT_PROMPT
-from core.images import generate_dish_image_bytes
+from apps.Peet_Kiest_Vooruit.pdf_vooruit import build_vooruit_pdf
 
 
-# =========================================================
-# CONFIG
-# =========================================================
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5.2")
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-
-# =========================================================
-# PAGE CONFIG (MOET ALS EERSTE)
-# =========================================================
+# -------------------------------------------------
+# Page config
+# -------------------------------------------------
 st.set_page_config(
-    page_title="Peet Kiest – Vooruit",
-    layout="centered"
+    page_title="PeetKiest Vooruit",
+    page_icon="🍽️",
+    layout="centered",
 )
 
-# =========================================================
-# SESSION STATE INIT — VERPLICHT VOOR EERSTE RUN
-# =========================================================
 
-if "last_request_key" not in st.session_state:
-    st.session_state.last_request_key = None
+# -------------------------------------------------
+# Helpers
+# -------------------------------------------------
+import re
 
-if "result" not in st.session_state:
-    st.session_state.result = None
+def simplify_dish_name(dish_name: str, vegetarian: bool = False) -> str:
+    name = dish_name.lower()
 
-# ============================================================
-# UI — GROTERE SPINNERTEKST
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-    /* Spinner tekst */
-    div[data-testid="stSpinner"] > div > div {
-        font-size: 1.8rem;      /* pas aan: 1.2 / 1.4 / 1.6 */
-        font-weight: 500;
+    # Hoofdingrediënten eerst (prioriteit!)
+    primary_map = {
+        "witloof": "chicory endive",
+        "zalm": "salmon fillet",
+        "kabeljauw": "cod fillet",
+        "mosselen": "mussels",
+        "boerenkool": "kale",
+        "hutspot": "carrot potato mash",
+        "stamppot": "mashed potatoes",
     }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
-#
-# =========================================================
-# HELPERS
-# =========================================================
+    # Secundaire componenten
+    secondary_map = {
+        "aardappel": "potatoes",
+        "puree": "potato puree",
+        "friet": "fries",
+        "frieten": "fries",
+        "prei": "leek",
+        "roomsaus": "cream sauce",
+        "jus": "gravy",
+        "gehakt": "ground beef",
+        "worst": "sausage",
+        "runderworst": "sausage",
+        "champignon": "mushrooms",
+    }
 
-def _extract_json(text: str) -> dict:
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("Geen JSON gevonden in model-output.")
-    return json.loads(text[start:end + 1])
+    # Vegetarische correctie
+    if vegetarian:
+        secondary_map.update({
+            "worst": "vegetarian sausage",
+            "runderworst": "vegetarian sausage",
+            "gehakt": "plant based ground beef",
+            "jus": "vegetarian gravy",
+        })
 
-def call_peet(context: str) -> dict:
-    resp = client.responses.create(
-        model=MODEL,
-        temperature=0.2,
-        input=[
-            {
-                "role": "system",
-                "content": PEET_KIEST_VOORUIT_PROMPT.strip()
+    primary = None
+    secondary = []
+
+    # Zoek primary eerst
+    for nl, en in primary_map.items():
+        if nl in name:
+            primary = en
+            break
+
+    # Zoek secundaire ingrediënten
+    for nl, en in secondary_map.items():
+        if nl in name:
+            secondary.append(en)
+
+    keywords = []
+
+    if primary:
+        keywords.append(primary)
+
+    if secondary:
+        keywords.extend(secondary[:2])  # max 2 extra
+
+    if not keywords:
+        keywords.append(name)
+
+    return " ".join(keywords) + " plated restaurant meal close up"
+
+
+def build_image_url(dish_name: str, vegetarian: bool = False) -> str:
+    api_key = os.getenv("PEXELS_API_KEY")
+
+    if not api_key or not dish_name:
+        return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80"
+
+    search_query = simplify_dish_name(dish_name, vegetarian)
+
+    try:
+        response = requests.get(
+            "https://api.pexels.com/v1/search",
+            headers={"Authorization": api_key},
+            params={
+                "query": search_query,
+                "per_page": 5,
+                "orientation": "landscape",
+                "size": "large",
+                "locale": "en-US"
             },
-            {
-                "role": "user",
-                "content": context
-            }
-        ]
-    )
+            timeout=5,
+        )
 
-    return _extract_json(resp.output_text)
+        data = response.json()
 
-# ============================================================
-# CARRD → QUERY PARAMS (ROBUST) + AUTO-RUN (NOOIT WIT SCHERM)
-# ============================================================
+        if "photos" in data and len(data["photos"]) > 0:
+            return data["photos"][0]["src"]["landscape"]
 
-st.title("Peet is aan het kiezen")
-st.write("We hebben meer dan 1 miljoen recepten, dus het kan ff duren. Geen stress, Peet regelt het.")
+    except Exception:
+        pass
 
-params = st.query_params
+    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80"
 
-def _first(key: str, default: str) -> str:
-    """
-    Streamlit kan query params als str of als list[str] teruggeven.
-    Deze helper pakt altijd de 'eerste' waarde.
-    """
-    v = params.get(key, default)
+
+def _qp(name: str, default: str = "") -> str:
+    v = st.query_params.get(name, default)
     if isinstance(v, list):
         return v[0] if v else default
     return v if v is not None else default
 
-# --- Days (Carrd: days) ---
-# Carrd stuurt days=2|3|5. Als days ontbreekt: default 2.
-try:
-    days_from_query = int(_first("days", "2"))
-except Exception:
-    days_from_query = 2
 
-# Normaliseer days alvast
-if days_from_query not in (1, 2, 3, 5):
-    days_from_query = 2
+def _qp_dict() -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    for k in st.query_params.keys():
+        out[k] = _qp(k, "")
+    return out
 
-# --- Mode ---
-# We willen GEEN verplichte mode. Als mode ontbreekt: afleiden op basis van days.
-mode_raw = _first("mode", "").strip().lower()
-if mode_raw in ("vandaag", "vooruit"):
-    mode = mode_raw
-else:
-    mode = "vooruit" if days_from_query in (2, 3, 5) else "vandaag"
 
-# Effective days — leidend op days uit query
-try:
-    days = int(days_from_query)
-except Exception:
-    days = 2
-
-if days not in (1, 2, 3, 5):
-    days = 2
-
-# --- People (Carrd: persons) ---
-try:
-    people = int(_first("persons", "2"))
-except Exception:
-    people = 2
-people = max(1, min(10, people))
-
-# --- Veggie (Carrd: vegetarian) ---
-# Carrd checkbox kan o.a. "checked" of "on" sturen.
-veggie_raw = _first("vegetarian", "false").strip().lower()
-veggie = veggie_raw in ("true", "1", "yes", "y", "on", "checked")
-
-# --- Allergies (Carrd: allergies) ---
-allergies = _first("allergies", "").strip()
-
-# ============================================================
-# SESSION STATE = ENIGE BRON VAN WAARHEID
-# ============================================================
-
-st.session_state.mode = mode
-st.session_state.days = days
-st.session_state.people = people
-st.session_state.veggie = veggie
-st.session_state.allergies = allergies
-
-request_key = json.dumps(
-    {
-        "mode": st.session_state.mode,
-        "days": st.session_state.days,
-        "people": st.session_state.people,
-        "veggie": st.session_state.veggie,
-        "allergies": st.session_state.allergies,
-    },
-    sort_keys=True
-)
-
-# Alleen opnieuw genereren als de request echt anders is
-if st.session_state.last_request_key != request_key:
-    st.session_state.result = None
-    st.session_state.last_request_key = request_key
-
-# ============================================================
-# AUTO-RUN: als er nog geen resultaat is -> call_peet
-# ============================================================
-
-if st.session_state.result is None:
+def _safe_json_load(raw: Any) -> Dict[str, Any]:
     try:
-        with st.spinner("Peet is aan het kiezen…"):
-            context = json.dumps(
-                {
-                    "mode": st.session_state.mode,
-                    "days": st.session_state.days,
-                    "people": st.session_state.people,
-                    "veggie": st.session_state.veggie,
-                    "allergies": st.session_state.allergies,
-                },
-                ensure_ascii=False
-            )
-            st.session_state.result = call_peet(context)
-    except Exception as e:
-        msg = str(e)
-        if "insufficient_quota" in msg or "429" in msg:
-            st.error("Ik kan nu even geen keuze maken omdat de API-limiet op is. Probeer later opnieuw.")
-        elif "api_key" in msg.lower() or "authentication" in msg.lower():
-            st.error("De app kan OpenAI niet gebruiken: check je Streamlit Secrets (OPENAI_API_KEY).")
-        else:
-            st.error("Er ging iets mis bij het kiezen. Probeer nog een keer.")
-        with st.expander("Technische info (handig voor debug)", expanded=False):
-            st.write("Query params:")
-            st.write(dict(params))
-            st.write("Foutmelding:")
-            st.write(msg)
-        st.stop()
+        if isinstance(raw, dict):
+            return raw
+        s = str(raw or "").strip()
+        if s.startswith("```"):
+            s = s.replace("```json", "").replace("```", "").strip()
+        return json.loads(s)
+    except Exception:
+        return {}
 
-# ============================================================
-# RESULT VALIDATIE (NOOIT STIL STOPPEN)
-# ============================================================
 
-result = st.session_state.get("result")
-if not isinstance(result, dict):
-    st.error("Ik kreeg geen bruikbaar resultaat terug. Probeer nog eens.")
-    with st.expander("Technische info", expanded=False):
-        st.write(result)
-    st.stop()
+def _ensure_output_dirs() -> Path:
+    base = Path("output") / "vooruit"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
-days_data = result.get("days")
-if not isinstance(days_data, list) or not days_data:
-    st.error("Ik kreeg een resultaat terug, maar niet in het verwachte formaat.")
-    with st.expander("Technische info (resultaat)", expanded=False):
-        st.json(result)
-    st.stop()
 
-# =========================================================
-# RESULT CARDS
-# =========================================================
+def _signature(inp: Dict[str, Any], rotation_index: int) -> str:
+    payload = json.dumps(
+        {"inp": inp, "rot": rotation_index},
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
-for day in days_data:
-    with st.container(border=True):
-        # Titel
-        st.markdown(f"### Dag {day['day']}")
-        st.markdown(f"**{day['screen8']['dish_name']}**")
 
-        # Beschrijving
-        if day.get("description"):
-            st.markdown(day["description"])
+def _build_prompt(context: Dict[str, Any]) -> str:
+    days = int(context["days"])
+    persons = int(context["persons"])
+    vegetarian = bool(context["vegetarian"])
+    allergies = context.get("allergies", [])
+    nogo = context.get("nogo", [])
+    fridge = str(context.get("fridge", "") or "").strip()
+    kitchen_plan = context["kitchen_plan"]
 
-        # Motivatie (rustig, ondergeschikt)
-        if day.get("motivation"):
-            st.caption(day["motivation"])
-
-        # Afbeelding pas op expliciete actie
-        if st.button(
-            "Laat een foto zien",
-            key=f"img_{day['day']}",
-            use_container_width=True
-        ):
-            with st.spinner("Even zoeken…"):
-                img = generate_dish_image_bytes(
-                    day["screen8"]["dish_name"]
-                )
-                if img:
-                    st.image(img, use_container_width=True)
-
-    # Ruimte tussen cards
-    st.markdown(
-        "<div style='height: 1.5rem'></div>",
-        unsafe_allow_html=True
+    kp_lines = "\n".join(
+        [f"- Dag {d}: {kitchen_plan.get(d, 'NL/BE')}" for d in range(1, days + 1)]
     )
 
+    diet_line = "vegetarisch" if vegetarian else "vlees/vis/vega toegestaan"
+    allergies_line = ", ".join(allergies) if allergies else "geen"
+    nogo_line = ", ".join(nogo) if nogo else "geen"
+    fridge_line = fridge if fridge else "niets specifieks"
+
+    return f"""
+Je bent PeetKiest Vooruit. Jij maakt een meerdaagse planning. Jij kiest, geen opties.
+
+OUTPUT REGEL:
+- Je output is ALLEEN geldige JSON
+- Geen markdown, geen tekst buiten JSON
+
+Plan {days} dagen vooruit voor {persons} personen.
+
+KEUKENPLAN:
+{kp_lines}
+
+DIEET:
+- stijl: {diet_line}
+- allergieën: {allergies_line}
+- no-go: {nogo_line}
+- in huis: {fridge_line}
+
+KWALITEIT:
+- Exact 1 gerecht per dag
+- Variatie in hoofdcomponent
+- Kcal en macro’s verplicht
+
+BEREIDINGSTOON:
+- De bereidingswijze is geschreven in Peet-stijl.
+- Gebruik de titel: "Zo pakken we het aan"
+- Spreek licht begeleidend, alsof Peet naast je staat.
+- Geen droge instructies, maar korte, duidelijke zinnen.
+- Zelfverzekerd, rustig en praktisch.
+- Geen overdreven gezelligheid, geen emoji’s.
+- Geen uitleg waarom iets gezond is.
+- Gewoon koken, helder en prettig.
+
+
+JSON SCHEMA:
+{{
+  "days": [
+    {{
+      "day": 1,
+      "kitchen": "NL/BE",
+      "dish_name": "...",
+      "nutrition": {{
+        "calories_kcal": 0,
+        "protein_g": 0,
+        "fat_g": 0,
+        "carbs_g": 0
+      }},
+      "ingredients": [{{"amount": "...", "item": "..."}}],
+      "preparation": ["..."]
+    }}
+  ],
+  "shopping_list": [
+    {{"zone": "AGF", "item": "uien", "amount": "..."}}
+  ]
+}}
+""".strip()
+
+
+@st.cache_data(show_spinner=False)
+def _call_llm_cached(prompt: str) -> str:
+    return call_peet_vooruit(prompt, system_prompt=prompt)
+
+
+def _normalize_day_preparation(day: Dict[str, Any]) -> Dict[str, Any]:
+    if "preparation" not in day and "steps" in day:
+        day["preparation"] = day.get("steps", [])
+        day.pop("steps", None)
+    return day
+
+
+def normalize_vooruit_output(raw: Dict[str, Any], expected_days: int):
+    if not isinstance(raw, dict):
+        return None
+
+    if isinstance(raw.get("days"), list) and raw["days"]:
+        return raw
+
+    if "dish_name" in raw and expected_days > 0:
+        days = []
+        for i in range(1, expected_days + 1):
+            entry = raw.copy()
+            entry["day"] = i
+            entry.setdefault("kitchen", "")
+            days.append(entry)
+        return {"days": days, "shopping_list": raw.get("shopping_list", [])}
+
+    return None
+
+
+# -------------------------------------------------
+# UI
+# -------------------------------------------------
+st.title("PeetKiest Vooruit")
+st.caption("Dagen vooruit gepland met Eén boodschappenlijst.")
+
+qp = _qp_dict()
+inp = parse_query_params(qp)
+
+if "pk_v_rot" not in st.session_state:
+    st.session_state["pk_v_rot"] = 0
+
+rotation_index = int(st.session_state["pk_v_rot"])
+kitchen_plan = compute_kitchen_plan(inp.days, rotation_index)
+
+context = {
+    "days": inp.days,
+    "persons": inp.persons,
+    "vegetarian": inp.vegetarian,
+    "allergies": inp.allergies,
+    "nogo": inp.nogo,
+    "fridge": inp.fridge,
+    "kitchen_plan": kitchen_plan,
+}
+
+
+with st.expander("Invoer", expanded=False):
+    st.write(context)
+
+
+col1, col2 = st.columns(2)
+with col1:
+    regen = st.button("Maak planning", use_container_width=True)
+with col2:
+    if st.button("Nieuwe variant", use_container_width=True):
+        st.session_state["pk_v_rot"] = next_rotation_index(st.session_state["pk_v_rot"])
+        st.rerun()
+
+
+auto_run = bool(qp.get("days")) and bool(qp.get("persons"))
+should_run = regen or auto_run
+
+
+if should_run:
+    prompt = _build_prompt(context)
+    sig = _signature(context, rotation_index)
+
+    if st.session_state.get("pk_v_sig") != sig:
+        st.session_state["pk_v_sig"] = sig
+        with st.spinner("Peet kiest en plant…"):
+            st.session_state["pk_v_raw"] = _call_llm_cached(prompt)
+        st.session_state.pop("pk_v_pdf", None)
 
 
 
-# =========================================================
-# GLOBAL STYLING (TYPOGRAFIE & LAYOUT)
-# =========================================================
-st.markdown("""
-<style>
-.block-container { max-width: 680px; padding-top: 2.5rem; padding-bottom: 3rem; }
-html, body, [class*="css"] { font-size: 17px; line-height: 1.55; }
-h1 { font-size: 1.9rem; font-weight: 600; margin-bottom: 0.9rem; }
-h2 { font-size: 1.4rem; font-weight: 600; margin-top: 2.2rem; margin-bottom: 0.6rem; }
-h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1.6rem; }
-p { margin-bottom: 1.1rem; }
-.stButton > button { width: 100%; padding: 0.75rem; font-size: 1rem; border-radius: 6px; }
-</style>
-""", unsafe_allow_html=True)
 
-# =========================================================
-# PDF MAKEN – FUNCTIES
-# =========================================================
+raw = _safe_json_load(st.session_state.get("pk_v_raw"))
+normalized = normalize_vooruit_output(raw, inp.days)
 
-def build_vooruit_pdf(days_data):
-    pdf_days = []
+if not normalized:
+    st.info("Geef days/persons mee via Carrd of klik op ‘Maak planning’.")
+    st.stop()
 
-    for day in days_data:
-        pdf_days.append({
-            "day": day["day"],
-            "dish_name": day["screen8"]["dish_name"],
-            "ingredient_groups": day["recipe"]["ingredient_groups"],
-            "steps": day["recipe"]["steps"],
-        })
-
-    return {
-        "title": "Peet Kiest – Vooruit",
-        "date": date.today().isoformat(),
-        "days": pdf_days,
-    }
+days_out = [_normalize_day_preparation(d) for d in normalized["days"]]
+shopping_list = normalized.get("shopping_list", [])
 
 
-def build_combined_shopping_list(days_data):
-    # vaste winkelcategorieën (volgorde = winkel-logica)
-    categories = {
-        "Groente & fruit": set(),
-        "Vlees, vis & vega": set(),
-        "Zuivel & eieren": set(),
-        "Kruiden, sauzen & olie": set(),
-        "Houdbaar": set(),
-        "Overig": set(),
-    }
+for d in days_out:
+    day_no = d.get("day", "?")
+    kitchen = d.get("kitchen", "")
+    dish_name = d.get("dish_name", "")
 
-    keyword_map = {
-        "Groente & fruit": [
-            "ui", "knoflook", "prei", "paprika", "tomaat", "wortel",
-            "courgette", "aubergine", "spinazie", "sla", "citroen",
-            "citroensap", "doperwt", "boon", "broccoli", "bloemkool",
-            "venkel", "appel", "krieltjes", "aardappel", "kruimige",
-            "peterselie", "dille", "boerenkool", "champignons", "bleekselderij"
-        ],
-        "Vlees, vis & vega": [
-            "kip", "gehakt", "rund", "varken", "worst", "braadworst",
-            "vis", "zalm", "tonijn", "tofu", "tempeh", "vega"
-        ],
-        "Zuivel & eieren": [
-            "melk", "room", "kaas", "yoghurt", "boter", "ei", "eieren"
-        ],
-        "Kruiden, sauzen & olie": [
-            "olie", "olijfolie", "zout", "peper", "mosterd",
-            "kerrie", "paprika", "komijn", "saus",
-            "sojasaus", "azijn", "nootmuskaat"
-        ],
-        "Houdbaar": [
-            "pasta", "rijst", "couscous", "bulgur", "linzen",
-            "bonen", "tomatenblok", "bouillon", "blik",
-            "bloem"
-        ],
-    }
+    nutr = d.get("nutrition", {}) or {}
 
-    def normalize(item: str) -> str:
-        return item.lower().strip()
+    #-------------------------------------------------
+    # Bouw dynamische afbeelding op basis van gerecht
+    #-------------------------------------------------
 
-    def map_category(item: str) -> str:
-        item_lc = normalize(item)
-        for cat, keywords in keyword_map.items():
-            if any(k in item_lc for k in keywords):
-                return cat
-        return "Overig"
+    image_url = build_image_url(dish_name)
 
-    for day in days_data:
-        for grp in day["recipe"]["ingredient_groups"]:
-            for item in grp.get("items", []):
-                cat = map_category(item)
-                categories[cat].add(item)
+    render_peet_hero(
+        title=dish_name,
+        subtitle=f"Dag {day_no} • {kitchen}",
+        image_url=image_url,
+        kcal=nutr.get("calories_kcal"),
+        protein=nutr.get("protein_g"),
+        fat=nutr.get("fat_g"),
+        carbs=nutr.get("carbs_g"),
+    )
 
-    # Overig alleen tonen als er écht iets in zit
-    return {
-        cat: sorted(items)
-        for cat, items in categories.items()
-        if items and not (cat == "Overig" and len(items) == 0)
-    }
+    # -------------------------
+    # Ingrediënten
+    # -------------------------
+    st.markdown("**Ingrediënten**")
 
+    ingredients = d.get("ingredients", [])
 
-def render_vooruit_pdf(pdf_data, shopping_list):
-    from reportlab.lib.utils import simpleSplit
+    if ingredients:
 
-    output_dir = "output/peet_kiest_vooruit"
-    os.makedirs(output_dir, exist_ok=True)
+        clean_ingredients = []
 
-    filename = f"Peet_Kiest_Vooruit_{date.today().strftime('%Y%m%d')}.pdf"
-    path = os.path.join(output_dir, filename)
+        for ing in ingredients:
+            if isinstance(ing, dict):
+                amount = str(ing.get("amount", "")).strip()
+                item = str(ing.get("item", "")).strip()
+                if amount and item:
+                    clean_ingredients.append(f"{amount} {item}")
+                elif item:
+                    clean_ingredients.append(item)
 
-    c = canvas.Canvas(path, pagesize=A4)
-    width, height = A4
+        mid = (len(clean_ingredients) + 1) // 2
+        col1_items = clean_ingredients[:mid]
+        col2_items = clean_ingredients[mid:]
 
-    # ===============================
-    # PER DAG: ELK GERECHT OP EIGEN PAGINA
-    # ===============================
-    for idx, day in enumerate(pdf_data["days"]):
+        col1, col2 = st.columns(2)
 
-        # Vanaf dag 2 pas een nieuwe pagina
-        if idx > 0:
-            c.showPage()
-
-        y = height - 40
-
-        # Dagkop
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(40, y, f"Dag {day['day']} – {day['dish_name']}")
-        y -= 30
-
-        # Ingrediënten
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(40, y, "Ingrediënten")
-        y -= 18
-
-        c.setFont("Helvetica", 10)
-        for grp in day["ingredient_groups"]:
-            c.drawString(50, y, grp["name"])
-            y -= 14
-            for it in grp["items"]:
-                c.drawString(65, y, f"- {it}")
-                y -= 12
-            y -= 6
-
-        y -= 10
-
-        # Bereiding
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(40, y, "Bereiding")
-        y -= 18
-
-        c.setFont("Helvetica", 10)
-        max_width = width - 90
-        line_height = 12
-
-        for step in day["steps"]:
-            lines = simpleSplit(step["text"], "Helvetica", 10, max_width)
-            for line in lines:
-                c.drawString(50, y, line)
-                y -= line_height
-            y -= 8
-
-    # ===============================
-    # BOODSCHAPPENLIJST OP EIGEN PAGINA
-    # ===============================
-    c.showPage()
-    y = height - 40
-
-    c.setFont("Helvetica-Bold", 15)
-    c.drawString(40, y, "Gecombineerde boodschappenlijst")
-    y -= 30
-
-    c.setFont("Helvetica", 10)
-    for grp, items in shopping_list.items():
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(40, y, grp)
-        y -= 16
-
-        c.setFont("Helvetica", 10)
-        for it in items:
-            c.drawString(55, y, f"- {it}")
-            y -= 12
-
-            if y < 120:
-                c.showPage()
-                y = height - 40
-                c.setFont("Helvetica", 10)
-
-        y -= 12
-
-    c.save()
-    return path
-
-# =========================================================
-# PDF DATA BOUWEN (TOP-LEVEL)
-# =========================================================
-
-pdf_data = build_vooruit_pdf(days_data)
-shopping_list = build_combined_shopping_list(days_data)
-pdf_path = render_vooruit_pdf(pdf_data, shopping_list)
-
-# =========================================================
-# PDF CARD
-# =========================================================
-
-with st.container(border=True):
-    st.markdown("### Alles bij elkaar")
-
-    if pdf_path:
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                label="Bekijk recept & boodschappen (PDF)",
-                data=f,
-                file_name=os.path.basename(pdf_path),
-                mime="application/pdf",
-                use_container_width=True
+        with col1:
+            st.markdown(
+                "<div style='line-height:1.2; font-size:15px;'>"
+                + "<br>".join(col1_items)
+                + "</div>",
+                unsafe_allow_html=True
             )
 
+        with col2:
+            st.markdown(
+                "<div style='line-height:1.2; font-size:15px;'>"
+                + "<br>".join(col2_items)
+                + "</div>",
+                unsafe_allow_html=True
+            )
+
+    # -------------------------
+    # Bereiding
+    # -------------------------
+    st.markdown("**Zo pakken we het aan.**")
+
+    for i, step in enumerate(d.get("preparation", []), 1):
+        st.markdown(f"{i}. {step}")
+
+    st.divider()

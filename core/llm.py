@@ -83,5 +83,61 @@ def call_peet_text(user_context: str, *, system_prompt: str = PROMPT):
             # onbekende fout → geen crash
             return "Peet kon het gerecht niet ophalen. Refresh even."
 
+# -------------------------------------------------
+# PeetKiest Vooruit — nieuw, geïsoleerd
+# -------------------------------------------------
+def call_peet_vooruit(user_context: str, *, system_prompt: str):
+
+    """
+    PeetKiest Vooruit (2–5 dagen)
+
+    - gebruikt eigen prompt
+    - zelfde retry- en foutgedrag
+    - raakt call_peet_text NIET
+    """
+
+    if not API_KEY:
+        return "Peet kan even geen verbinding maken. API-sleutel ontbreekt."
+
+    attempt = 0
+
+    while attempt < MAX_RETRIES:
+        try:
+            resp = _client.responses.create(
+                model=MODEL,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_context},
+                ],
+                max_output_tokens=3000,  # meer ruimte voor meerdere dagen
+            )
+
+            text = (resp.output_text or "").strip()
+
+            if not text:
+                return "Peet kwam even niet uit zijn woorden. Probeer opnieuw."
+
+            return text
+
+        except RateLimitError:
+            attempt += 1
+            if attempt >= MAX_RETRIES:
+                return "Peet heeft het druk. Probeer het zo nog eens."
+            time.sleep(RETRY_DELAY * attempt)
+
+        except APITimeoutError:
+            attempt += 1
+            if attempt >= MAX_RETRIES:
+                return "Peet deed er te lang over. Probeer opnieuw."
+            time.sleep(RETRY_DELAY * attempt)
+
+        except APIError:
+            attempt += 1
+            if attempt >= MAX_RETRIES:
+                return "Peet had een technisch probleem. Nog een keer proberen helpt meestal."
+            time.sleep(RETRY_DELAY * attempt)
+
+        except Exception:
+            return "Peet kon het menu niet ophalen. Refresh even."
 
 # -------------------------------------------------
