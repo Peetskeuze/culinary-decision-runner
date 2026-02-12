@@ -43,16 +43,40 @@ def to_list(val):
     if not val:
         return []
     return [p.strip().lower() for p in str(val).split(",") if p.strip()]
+# -------------------------------------------------
+# Hard constraints (Peet Card)
+# -------------------------------------------------
+TIME_MAX_BY_QUERY = {
+    "20": 20,
+    "30-45": 45,
+    "30_45": 45,
+    "30–45": 45,
+    ">45": 90,
+    "45+": 90,
+    "meer dan 45": 90,
+}
+
+def time_cap_from_query(time_raw: str) -> int | None:
+    return TIME_MAX_BY_QUERY.get(str(time_raw).strip())
+
+def looks_like_wrap(text: str) -> bool:
+    t = (text or "").lower()
+    return any(w in t for w in ["wrap", "wraps", "tortilla"])
 
 # -------------------------------------------------
 # Context builder (vrije Peet-stijl)
 # -------------------------------------------------
 def build_llm_context():
-
+    # -------------------------------------------------
+    # Forward check (2–3–5 dagen)
+    # -------------------------------------------------
     days = to_int(qp("days", "1"), 1)
     if days in (2, 3, 5):
         return "__FORWARD__"
 
+    # -------------------------------------------------
+    # Basis context
+    # -------------------------------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
     moment = qp("moment")
@@ -60,23 +84,58 @@ def build_llm_context():
     preference = qp("preference")
     vegetarian = qp("vegetarian")
     time_raw = qp("time")
-    # -----------------------------
-    # Kooktijd interpretatie
-    # -----------------------------
-    cook_time_text = ""
-
-    if time_raw == "20":
-        cook_time_text = "Het gerecht moet binnen maximaal 20 minuten klaar zijn."
-
-    elif time_raw in ["30-45", "30_45", "30–45"]:
-        cook_time_text = "Het gerecht moet binnen ongeveer 30 tot 45 minuten klaar zijn."
-
-    elif time_raw in [">45", "45+", "meer dan 45"]:
-        cook_time_text = "Het gerecht mag langer duren en mag uitgebreider zijn."
 
     allergies = to_list(qp("allergies"))
     nogo = to_list(qp("nogo"))
+    fridge_items = to_list(qp("fridge"))
 
+    # -------------------------------------------------
+    # Kooktijd — hard plafond
+    # -------------------------------------------------
+    cook_time_text = ""
+
+    TIME_MAX_BY_QUERY = {
+        "kort": 20,
+        "20": 20,
+        "30-45": 45,
+        "30_45": 45,
+        "30–45": 45,
+        ">45": 90,
+        "45+": 90,
+        "meer dan 45": 90,
+    }
+
+    max_minutes = TIME_MAX_BY_QUERY.get(str(time_raw).strip())
+
+    if max_minutes:
+        cook_time_text = (
+            f"Het gerecht moet binnen maximaal {max_minutes} minuten klaar zijn. "
+            f"Overschrijden is niet toegestaan."
+        )
+
+    # -------------------------------------------------
+    # Koelkast — LEIDEND
+    # -------------------------------------------------
+    fridge_text = ""
+
+    if fridge_items:
+        fridge_text = (
+            "KOELKAST IS LEIDEND. "
+            "Gebruik deze ingrediënten als vertrekpunt van het gerecht: "
+            + ", ".join(fridge_items) + ". "
+            "Bouw het gerecht hier logisch omheen."
+        )
+
+        # specifieke afdwinging: wraps
+        if "wraps" in fridge_items or "tortilla" in fridge_items:
+            fridge_text += (
+                " Omdat wraps beschikbaar zijn, is het gerecht een wrap. "
+                "Geen bowl, geen bord en geen gedeconstrueerde variant."
+            )
+
+    # -------------------------------------------------
+    # Contextregels opbouwen
+    # -------------------------------------------------
     lines = [
         "CONTEXT VANDAAG:",
         f"- persons: {persons}",
@@ -84,6 +143,9 @@ def build_llm_context():
 
     if cook_time_text:
         lines.append(f"- kooktijd: {cook_time_text}")
+
+    if fridge_text:
+        lines.append(f"- koelkast: {fridge_text}")
 
     if moment:
         lines.append(f"- moment: {moment}")
@@ -103,9 +165,12 @@ def build_llm_context():
     if nogo:
         lines.append(f"- no-go: {', '.join(nogo)}")
 
+    # -------------------------------------------------
+    # Afsluitende Peet-regels
+    # -------------------------------------------------
     lines.extend([
         "",
-        "KIES VRIJ.",
+        "KIES VRIJ BINNEN DEZE KADERS.",
         "GEEN STANDAARDGERECHTEN.",
         "GEEN HERHALING.",
         "RESPECTEER VEGETARISCH, ALLERGIEËN EN NO-GO’S VOLLEDIG."
