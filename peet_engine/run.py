@@ -10,9 +10,9 @@ from peet_engine.context import build_context
 from peet_engine.engine import plan
 
 
-def call_peet(raw_input: str | Dict[str, Any]) -> Dict[str, Any]:
+def call_peet_engine(raw_input: str | Dict[str, Any]) -> Dict[str, Any]:
     """
-    Stabiele entrypoint voor Peet Engine.
+    Stabiele entrypoint voor Peet Engine (ENGINE-laag).
 
     raw_input:
       - JSON string (van Streamlit / Carrd)
@@ -29,7 +29,7 @@ def call_peet(raw_input: str | Dict[str, Any]) -> Dict[str, Any]:
     # 2. Context bouwen
     context = build_context(raw_input)
 
-    # 3. Engine uitvoeren (juiste API)
+    # 3. Engine uitvoeren
     result = plan(context)
 
     return result

@@ -363,7 +363,7 @@ for d in days_out:
     # Bouw dynamische afbeelding op basis van gerecht
     #-------------------------------------------------
 
-    image_url = build_image_url(dish_name)
+    image_url = build_image_url(dish_name, context["vegetarian"])
 
     render_peet_hero(
         title=dish_name,

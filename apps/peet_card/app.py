@@ -1,3 +1,6 @@
+import os
+print("RUNNING APP:", os.path.abspath(__file__))
+
 # -------------------------------------------------
 # Project root toevoegen aan PYTHONPATH
 # -------------------------------------------------
@@ -67,6 +70,8 @@ def looks_like_wrap(text: str) -> bool:
 # Context builder (vrije Peet-stijl)
 # -------------------------------------------------
 def build_llm_context():
+    import datetime
+
     # -------------------------------------------------
     # Forward check (2–3–5 dagen)
     # -------------------------------------------------
@@ -75,7 +80,7 @@ def build_llm_context():
         return "__FORWARD__"
 
     # -------------------------------------------------
-    # Basis context
+    # Basis input
     # -------------------------------------------------
     persons = max(1, min(12, to_int(qp("persons", "2"), 2)))
 
@@ -90,10 +95,21 @@ def build_llm_context():
     fridge_items = to_list(qp("fridge"))
 
     # -------------------------------------------------
-    # Kooktijd — hard plafond
+    # Variatie-as (stil, dagelijks roterend)
     # -------------------------------------------------
-    cook_time_text = ""
+    variation_axes = [
+        "focus op bereidingstechniek",
+        "focus op eiwitbron",
+        "focus op kruiding en smaakprofiel",
+    ]
+    variation_index = datetime.date.today().toordinal() % len(variation_axes)
+    variation_hint = variation_axes[variation_index]
 
+    st.session_state["variation_hint"] = variation_hint
+
+    # -------------------------------------------------
+    # Kooktijd — harde mapping
+    # -------------------------------------------------
     TIME_MAX_BY_QUERY = {
         "kort": 20,
         "20": 20,
@@ -105,6 +121,7 @@ def build_llm_context():
         "meer dan 45": 90,
     }
 
+    cook_time_text = ""
     max_minutes = TIME_MAX_BY_QUERY.get(str(time_raw).strip())
 
     if max_minutes:
@@ -114,7 +131,7 @@ def build_llm_context():
         )
 
     # -------------------------------------------------
-    # Koelkast — LEIDEND
+    # Koelkast — leidend maar niet dogmatisch
     # -------------------------------------------------
     fridge_text = ""
 
@@ -126,7 +143,6 @@ def build_llm_context():
             "Bouw het gerecht hier logisch omheen."
         )
 
-        # specifieke afdwinging: wraps
         if "wraps" in fridge_items or "tortilla" in fridge_items:
             fridge_text += (
                 " Omdat wraps beschikbaar zijn, is het gerecht een wrap. "
@@ -139,6 +155,7 @@ def build_llm_context():
     lines = [
         "CONTEXT VANDAAG:",
         f"- persons: {persons}",
+        f"- variatie-richting: {variation_hint}",
     ]
 
     if cook_time_text:
@@ -171,13 +188,13 @@ def build_llm_context():
     lines.extend([
         "",
         "KIES VRIJ BINNEN DEZE KADERS.",
+        "BRENG ACTIEF VARIATIE AAN TEN OPZICHTE VAN VERGELIJKBARE KEUZES.",
+        "VERMIJD DEZELFDE KERNSTRUCTUUR ALS EERDER.",
         "GEEN STANDAARDGERECHTEN.",
-        "GEEN HERHALING.",
         "RESPECTEER VEGETARISCH, ALLERGIEËN EN NO-GO’S VOLLEDIG."
     ])
 
     return "\n".join(lines)
-
 
 # -------------------------------------------------
 # Cached LLM call
@@ -540,7 +557,9 @@ def main():
     # -------------------------------------------------
     # Signature → nieuwe keuze bij andere input
     # -------------------------------------------------
-    context_sig = hashlib.md5(llm_context.encode("utf-8")).hexdigest()
+    variation_hint = st.session_state.get("variation_hint", "")
+    cache_key = llm_context + f"|{variation_hint}"
+    context_sig = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
 
     if st.session_state.get("context_sig") != context_sig:
 

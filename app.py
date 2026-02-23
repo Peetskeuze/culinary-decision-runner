@@ -1,3 +1,6 @@
+import os
+print("RUNNING APP:", os.path.abspath(__file__))
+
 # =========================================================
 # Peet kiest voor je — hoofdapp (Streamlit)
 # Optie 3: Invoer als default, Carrd als snelle launcher
